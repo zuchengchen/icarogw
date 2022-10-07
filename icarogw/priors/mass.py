@@ -9,29 +9,29 @@ import numpy as np
 import os
 from scipy.interpolate import interp2d
 
-# start of PBH mass function for pbh==========================================
-from julia.api import Julia
-jl = Julia(compiled_modules=False)
-jl.eval('include("/home/czc/projects/working/icarogw/examples/pbh_merger_rate.jl")')
+# # start of PBH mass function for pbh==========================================
+# from julia.api import Julia
+# jl = Julia(compiled_modules=False)
+# jl.eval('include("/home/czc/projects/working/icarogw/examples/pbh_merger_rate.jl")')
 
-log_R_pbh_log = jl.eval('log_R_pbh_log')
-log_R_pbh_log_norm = jl.eval('log_R_pbh_log_norm')
+# log_R_pbh_log = jl.eval('log_R_pbh_log')
+# log_R_pbh_log_norm = jl.eval('log_R_pbh_log_norm')
 
-log_R_pbh_log_nocut = jl.eval('log_R_pbh_log_nocut')
-log_R_pbh_log_nocut_norm = jl.eval('log_R_pbh_log_nocut_norm')
+# log_R_pbh_log_nocut = jl.eval('log_R_pbh_log_nocut')
+# log_R_pbh_log_nocut_norm = jl.eval('log_R_pbh_log_nocut_norm')
 
-log_R_pbh_power = jl.eval('log_R_pbh_power')
-log_R_pbh_power_norm = jl.eval('log_R_pbh_power_norm')
+# log_R_pbh_power = jl.eval('log_R_pbh_power')
+# log_R_pbh_power_norm = jl.eval('log_R_pbh_power_norm')
 
-log_R_pbh_power_nocut = jl.eval('log_R_pbh_power_nocut')
-log_R_pbh_power_nocut_norm = jl.eval('log_R_pbh_power_nocut_norm')
+# log_R_pbh_power_nocut = jl.eval('log_R_pbh_power_nocut')
+# log_R_pbh_power_nocut_norm = jl.eval('log_R_pbh_power_nocut_norm')
 
-log_R_pbh_cc = jl.eval('log_R_pbh_cc')
-log_R_pbh_cc_norm = jl.eval('log_R_pbh_cc_norm')
+# log_R_pbh_cc = jl.eval('log_R_pbh_cc')
+# log_R_pbh_cc_norm = jl.eval('log_R_pbh_cc_norm')
 
-log_R_pbh_cc_nocut = jl.eval('log_R_pbh_cc_nocut')
-log_R_pbh_cc_nocut_norm = jl.eval('log_R_pbh_cc_nocut_norm')
-# end of PBH mass function for pbh==========================================
+# log_R_pbh_cc_nocut = jl.eval('log_R_pbh_cc_nocut')
+# log_R_pbh_cc_nocut_norm = jl.eval('log_R_pbh_cc_nocut_norm')
+# # end of PBH mass function for pbh==========================================
 
 
 class mass_prior(object):
