@@ -347,7 +347,7 @@ class BBH_likelihood2(_bilby.Likelihood):
         elif population_model == 'BBH-powerlaw-double-gaussian':
             self.list_population_param = ['alpha', 'mmin', 'mmax', 'beta', 'mu_g_low', 'sigma_g_low',
                                           'mu_g_high', 'sigma_g_high', 'lambda_g', 'lambda_g_low', 'delta_m']
-        elif population_model in ["PBH-lognormal-1st", "PBH-lognormal-2nd"]:
+        elif population_model in ["PBH-lognormal", "PBH-lognormal-1st", "PBH-lognormal-2nd"]:
             self.list_population_param = ['mc', 'σc', 'log_fpbh']
         elif population_model in ["PBH-power-1st", "PBH-power-2nd"]:
             self.list_population_param = ['α', 'M', 'log_fpbh']

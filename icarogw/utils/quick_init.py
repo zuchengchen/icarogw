@@ -66,7 +66,7 @@ def initialize_prior_dict2(population, cosmology):
         prior_dict['gamma'] = _bilby.core.prior.Uniform(-4, 10, name='gamma')
         prior_dict['R0'] = _bilby.core.prior.Uniform(0, 200, name='$R_0$')
 
-    elif population in ["PBH-lognormal-1st", "PBH-lognormal-2nd"]:
+    elif population in ["PBH-lognormal", "PBH-lognormal-1st", "PBH-lognormal-2nd"]:
         prior_dict['mc'] = _bilby.core.prior.Uniform(5.0, 50.0, name='$M_c$')
         prior_dict['σc'] = _bilby.core.prior.Uniform(
             0.1, 2, name='$\\sigma_c$')
@@ -74,7 +74,8 @@ def initialize_prior_dict2(population, cosmology):
             -4.0, 0.0, name='$\\log_{10}\mathrm{fpbh}$')
 
     elif population in ["PBH-power-1st", "PBH-power-2nd"]:
-        prior_dict['α'] = _bilby.core.prior.Uniform(1.05, 4.0, name='$\\alpha$')
+        prior_dict['α'] = _bilby.core.prior.Uniform(
+            1.05, 4.0, name='$\\alpha$')
         prior_dict['M'] = _bilby.core.prior.Uniform(3.0, 10.0, name='$M$')
         prior_dict['log_fpbh'] = _bilby.core.prior.Uniform(
             -4.0, 0.0, name='$\\log_{10}\mathrm{fpbh}$')
@@ -87,8 +88,10 @@ def initialize_prior_dict2(population, cosmology):
 
     elif population in ["PBH-bpower-1st", "PBH-bpower-2nd"]:
         prior_dict['ms'] = _bilby.core.prior.Uniform(3.0, 15.0, name='$m_*$')
-        prior_dict['α1'] = _bilby.core.prior.Uniform(0.0, 100.0, name='$\\alpha_1$')
-        prior_dict['α2'] = _bilby.core.prior.Uniform(1.0, 3.0, name='$\\alpha_2$')
+        prior_dict['α1'] = _bilby.core.prior.Uniform(
+            0.0, 15.0, name='$\\alpha_1$')
+        prior_dict['α2'] = _bilby.core.prior.Uniform(
+            1.0, 3.0, name='$\\alpha_2$')
         prior_dict['log_fpbh'] = _bilby.core.prior.Uniform(
             -4.0, 0.0, name='$\\log_{10}\mathrm{fpbh}$')
 
