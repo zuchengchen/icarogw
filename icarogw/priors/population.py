@@ -1,20 +1,43 @@
+import numpy as np
+from numpy import log, exp, sqrt, pi
 import numpy as _np
 from . import custom_math_priors as _cmp
 import copy as _copy
 
-# PBH merger rate densigy ==========================================
-from julia.api import Julia
-jl = Julia(compiled_modules=False)
-jl.eval('include("/home/czc/projects/working/pbh/merger_history_gw190521/code/merger_rate.jl")')
+# # PBH merger rate densigy ==========================================
+# from julia.api import Julia
+# jl = Julia(compiled_modules=False)
+# jl.eval('include("/home/czc/projects/working/pbh/merger_history_gw190521/code/merger_rate.jl")')
 
-mergerRateDensity1st_log = jl.eval('mergerRateDensity1st_log')
-mergerRateDensity2nd_log = jl.eval('mergerRateDensity2nd_log')
-mergerRateDensity1st_power = jl.eval('mergerRateDensity1st_power')
-mergerRateDensity2nd_power = jl.eval('mergerRateDensity2nd_power')
-mergerRateDensity1st_CC = jl.eval('mergerRateDensity1st_CC')
-mergerRateDensity2nd_CC = jl.eval('mergerRateDensity2nd_CC')
-mergerRateDensity1st_bpower = jl.eval('mergerRateDensity1st_bpower')
-mergerRateDensity2nd_bpower = jl.eval('mergerRateDensity2nd_bpower')
+# mergerRateDensity1st_log = jl.eval('mergerRateDensity1st_log')
+# mergerRateDensity2nd_log = jl.eval('mergerRateDensity2nd_log')
+# mergerRateDensity1st_power = jl.eval('mergerRateDensity1st_power')
+# mergerRateDensity2nd_power = jl.eval('mergerRateDensity2nd_power')
+# mergerRateDensity1st_CC = jl.eval('mergerRateDensity1st_CC')
+# mergerRateDensity2nd_CC = jl.eval('mergerRateDensity2nd_CC')
+# mergerRateDensity1st_bpower = jl.eval('mergerRateDensity1st_bpower')
+# mergerRateDensity2nd_bpower = jl.eval('mergerRateDensity2nd_bpower')
+
+
+def Pm_log(m, mc, σc):
+    """
+    lognormal mass function
+    """
+    exp_value = -log(m / mc)**2 / (2 * σc**2)
+    return 1 / (sqrt(2*pi) * σc * m) * exp(exp_value)
+
+
+def mergerRateDensity_log(mc, σc, log_fpbh, m1, m2):
+    """See eq.(2) of https://arxiv.org/pdf/2108.11740v2.pdf"""
+    fpbh = 10**log_fpbh
+    σeq = 5e-3
+    p10 = Pm_log(m1, mc, σc) / m1
+    p20 = Pm_log(m2, mc, σc) / m2
+
+    return 2.8e6 * fpbh**2 * (0.7*fpbh**2 + σeq**2)**(-21/74) * \
+        np.minimum(p10, p20) * (p10 + p20) * \
+        (m1 * m2)**(3 / 37) * (m1 + m2)**(36 / 37)
+
 
 class population_prior(object):
 
@@ -44,6 +67,19 @@ class population_prior(object):
 
             to_ret += _np.log(R0) + dist['mass_1'].log_prob(
                 ms1) + dist['mass_2'].log_conditioned_prob(ms2, mmin * _np.ones_like(ms1), ms1)
+
+        elif self.name == "PBH-lognormal":
+            hyper_params_dict = self.hyper_params_dict
+            mc = hyper_params_dict['mc']
+            σc = hyper_params_dict['σc']
+            log_fpbh = hyper_params_dict['log_fpbh']
+
+            to_ret = _np.log(self.cosmo.dVc_by_dz(zs)) - _np.log1p(zs)
+
+            _zs = self.cosmo.t_at_z(zs) / self.cosmo.t_at_z(1e-4)
+            R1 = _zs ** (-34.0 / 37.0) * \
+                mergerRateDensity_log(mc, σc, log_fpbh, ms1, ms2)
+            to_ret += _np.log(R1)
 
         elif self.name == "PBH-lognormal-1st":
             hyper_params_dict = self.hyper_params_dict
