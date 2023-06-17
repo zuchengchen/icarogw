@@ -16,12 +16,17 @@ from ..cosmologies import w0waflatLCDM as _w0waflatLCDM
 
 from ..priors.mass import mass_prior as _mass_prior
 from ..priors.redshift import redshift_prior as _redshift_prior
-from ..utils.conversions import detector_frame_to_source_frame as _detector_frame_to_source_frame
-from ..utils.conversions import detector_to_source_jacobian as _detector_to_source_jacobian
+from ..utils.conversions import (
+    detector_frame_to_source_frame as _detector_frame_to_source_frame,
+)
+from ..utils.conversions import (
+    detector_to_source_jacobian as _detector_to_source_jacobian,
+)
 from ..priors.population import population_prior as _population_prior
+from ..priors.population import get_z_doppler
 
 
-__all__ = ['BBH_likelihood', 'hierarchical_analysis']
+__all__ = ["BBH_likelihood", "hierarchical_analysis"]
 
 
 class BBH_likelihood(_bilby.Likelihood):
@@ -50,11 +55,31 @@ class BBH_likelihood(_bilby.Likelihood):
         If True it will assume a log uniform prior on the number of events (no poissonian term). Otherwise will use the poissonian terms.
     """
 
-    def __init__(self, posterior_samples_dict, injections, mass_model, cosmo_model, rate_model,
-                 parallel=None, ln_evidences=None, scale_free=True):
+    def __init__(
+        self,
+        posterior_samples_dict,
+        injections,
+        mass_model,
+        cosmo_model,
+        rate_model,
+        parallel=None,
+        ln_evidences=None,
+        scale_free=True,
+    ):
 
-        if mass_model not in ['BBH-powerlaw', 'BBH-powerlaw-gaussian', 'BBH-broken-powerlaw', 'BBH-powerlaw-double-gaussian', 'PBH-lognormal', 'PBH-lognormal-nocut', 'PBH-powerlaw', 'PBH-powerlaw-nocut', 'PBH-cc', 'PBH-cc-nocut']:
-            print('mass model not known')
+        if mass_model not in [
+            "BBH-powerlaw",
+            "BBH-powerlaw-gaussian",
+            "BBH-broken-powerlaw",
+            "BBH-powerlaw-double-gaussian",
+            "PBH-lognormal",
+            "PBH-lognormal-nocut",
+            "PBH-powerlaw",
+            "PBH-powerlaw-nocut",
+            "PBH-cc",
+            "PBH-cc-nocut",
+        ]:
+            print("mass model not known")
             _sys.exit()
 
         # Some initialization below
@@ -73,8 +98,10 @@ class BBH_likelihood(_bilby.Likelihood):
 
         # In this loop we build the matrix of posteriro samples if we  are runnig with the parallel mode
         if parallel is not None:
-            len_samples = [len(self.posterior_samples_dict[event].distance)
-                           for event in list(self.posterior_samples_dict.keys())]
+            len_samples = [
+                len(self.posterior_samples_dict[event].distance)
+                for event in list(self.posterior_samples_dict.keys())
+            ]
             n_min = _np.min(len_samples)
             n_min = _np.min([n_min, parallel])
             n_ev = len(posterior_samples_dict)
@@ -82,91 +109,132 @@ class BBH_likelihood(_bilby.Likelihood):
             self.dl_parallel = _np.zeros([n_ev, n_min])
             self.m1det_parallel = _np.zeros([n_ev, n_min])
             self.m2det_parallel = _np.zeros([n_ev, n_min])
-            print('Using the parallel mode with {:d} samples'.format(n_min))
+            print("Using the parallel mode with {:d} samples".format(n_min))
 
             for i, event in enumerate(list(self.posterior_samples_dict.keys())):
                 len_single = len(self.posterior_samples_dict[event].distance)
                 rand_perm = _np.random.permutation(len_single)
 
-                self.dl_parallel[i,
-                                 :] = self.posterior_samples_dict[event].distance[rand_perm[:n_min]]
-                self.m1det_parallel[i,
-                                    :] = self.posterior_samples_dict[event].mass_1_det[rand_perm[:n_min]]
-                self.m2det_parallel[i,
-                                    :] = self.posterior_samples_dict[event].mass_2_det[rand_perm[:n_min]]
+                self.dl_parallel[i, :] = self.posterior_samples_dict[event].distance[
+                    rand_perm[:n_min]
+                ]
+                self.m1det_parallel[i, :] = self.posterior_samples_dict[
+                    event
+                ].mass_1_det[rand_perm[:n_min]]
+                self.m2det_parallel[i, :] = self.posterior_samples_dict[
+                    event
+                ].mass_2_det[rand_perm[:n_min]]
 
         # The lines below simply save a list of the parameters for the different population and cosmology models.
-        if mass_model == 'BBH-powerlaw':
-            self.list_pop_param = ['alpha', 'mmin', 'mmax', 'beta']
-        elif mass_model == 'BBH-powerlaw-gaussian':
+        if mass_model == "BBH-powerlaw":
+            self.list_pop_param = ["alpha", "mmin", "mmax", "beta"]
+        elif mass_model == "BBH-powerlaw-gaussian":
             self.list_pop_param = [
-                'alpha', 'mmin', 'mmax', 'beta', 'mu_g', 'sigma_g', 'lambda_peak', 'delta_m']
-        elif mass_model == 'BBH-broken-powerlaw':
-            self.list_pop_param = ['alpha_1', 'alpha_2',
-                                   'mmin', 'mmax', 'beta', 'b', 'delta_m']
-        elif mass_model == 'BBH-powerlaw-double-gaussian':
-            self.list_pop_param = ['alpha', 'mmin', 'mmax', 'beta', 'mu_g_low', 'sigma_g_low',
-                                   'mu_g_high', 'sigma_g_high', 'lambda_g', 'lambda_g_low', 'delta_m']
-        elif mass_model == 'PBH-lognormal':
-            self.list_pop_param = ['mc', 'σc', 'm_min', 'm_max']
-        elif mass_model == 'PBH-lognormal-nocut':
-            self.list_pop_param = ['mc', 'σc']
-        elif mass_model == 'PBH-powerlaw':
-            self.list_pop_param = ['α', 'm_min', 'm_max']
-        elif mass_model == 'PBH-powerlaw-nocut':
-            self.list_pop_param = ['α', 'm_min']
-        elif mass_model == 'PBH-cc':
-            self.list_pop_param = ['α', 'Mf', 'm_min', 'm_max']
-        elif mass_model == 'PBH-cc-nocut':
-            self.list_pop_param = ['α', 'Mf']
+                "alpha",
+                "mmin",
+                "mmax",
+                "beta",
+                "mu_g",
+                "sigma_g",
+                "lambda_peak",
+                "delta_m",
+            ]
+        elif mass_model == "BBH-broken-powerlaw":
+            self.list_pop_param = [
+                "alpha_1",
+                "alpha_2",
+                "mmin",
+                "mmax",
+                "beta",
+                "b",
+                "delta_m",
+            ]
+        elif mass_model == "BBH-powerlaw-double-gaussian":
+            self.list_pop_param = [
+                "alpha",
+                "mmin",
+                "mmax",
+                "beta",
+                "mu_g_low",
+                "sigma_g_low",
+                "mu_g_high",
+                "sigma_g_high",
+                "lambda_g",
+                "lambda_g_low",
+                "delta_m",
+            ]
+        elif mass_model == "PBH-lognormal":
+            self.list_pop_param = ["mc", "σc", "m_min", "m_max"]
+        elif mass_model == "PBH-lognormal-nocut":
+            self.list_pop_param = ["mc", "σc"]
+        elif mass_model == "PBH-powerlaw":
+            self.list_pop_param = ["α", "m_min", "m_max"]
+        elif mass_model == "PBH-powerlaw-nocut":
+            self.list_pop_param = ["α", "m_min"]
+        elif mass_model == "PBH-cc":
+            self.list_pop_param = ["α", "Mf", "m_min", "m_max"]
+        elif mass_model == "PBH-cc-nocut":
+            self.list_pop_param = ["α", "Mf"]
 
-        if cosmo_model in ['flatLCDM', 'fixed-flatLCDM', 'restricted-flatLCDM']:
-            self.cosmo_model = 'flatLCDM'
-            self.list_cosmo_param = ['H0', 'Om0']
-        elif cosmo_model == 'w0flatLCDM':
-            self.list_cosmo_param = ['H0', 'Om0', 'w0']
-        elif cosmo_model == 'w0waflatLCDM':
-            self.list_cosmo_param = ['H0', 'Om0', 'w0', 'wa']
+        if cosmo_model in ["flatLCDM", "fixed-flatLCDM", "restricted-flatLCDM"]:
+            self.cosmo_model = "flatLCDM"
+            self.list_cosmo_param = ["H0", "Om0"]
+        elif cosmo_model == "w0flatLCDM":
+            self.list_cosmo_param = ["H0", "Om0", "w0"]
+        elif cosmo_model == "w0waflatLCDM":
+            self.list_cosmo_param = ["H0", "Om0", "w0", "wa"]
         else:
-            print('Not yet implemented')
+            print("Not yet implemented")
             _sys.exit()
 
-        if self.rate_model in ['powerlaw', 'non-evolving']:
-            self.rate_model = 'powerlaw'
-            self.list_rate_param = ['gamma']
-        elif self.rate_model == 'madau':
-            self.list_rate_param = ['gamma', 'kappa', 'zp']
-        elif self.rate_model == 'PBH':
+        if self.rate_model in ["powerlaw", "non-evolving"]:
+            self.rate_model = "powerlaw"
+            self.list_rate_param = ["gamma"]
+        elif self.rate_model == "madau":
+            self.list_rate_param = ["gamma", "kappa", "zp"]
+        elif self.rate_model == "PBH":
             self.list_rate_param = []
 
         # Save the total list of parameters
         tot_list = self.list_pop_param + self.list_cosmo_param + self.list_rate_param
 
         if not self.scale_free:
-            tot_list = tot_list + ['R0']
+            tot_list = tot_list + ["R0"]
 
         # Initialize the Bilby parameters
         super().__init__(parameters={ll: None for ll in tot_list})
 
     def log_likelihood(self):
-        '''
+        """
         Evaluates and return the log-likelihood
-        '''
+        """
 
         # initialization of the mass prior for a given set of parameters
         dic = {ll: self.parameters[ll] for ll in self.list_pop_param}
         mp_model = _mass_prior(name=self.mass_model, hyper_params_dict=dic)
 
         # Initialize the cosmology for a set of parametrs
-        if self.cosmo_model == 'flatLCDM':
+        if self.cosmo_model == "flatLCDM":
             cosmo = _flatLCDM(
-                Omega_m=self.parameters['Om0'], H0=self.parameters['H0'], astropy_conv=False)
-        elif self.cosmo_model == 'w0flatLCDM':
-            cosmo = _w0flatLCDM(Omega_m=self.parameters['Om0'], H0=self.parameters['H0'],
-                                w0=self.parameters['w0'], astropy_conv=False)
-        elif self.cosmo_model == 'w0waflatLCDM':
-            cosmo = _w0waflatLCDM(Omega_m=self.parameters['Om0'], H0=self.parameters['H0'],
-                                  w0=self.parameters['w0'], wa=self.parameters['wa'], astropy_conv=False)
+                Omega_m=self.parameters["Om0"],
+                H0=self.parameters["H0"],
+                astropy_conv=False,
+            )
+        elif self.cosmo_model == "w0flatLCDM":
+            cosmo = _w0flatLCDM(
+                Omega_m=self.parameters["Om0"],
+                H0=self.parameters["H0"],
+                w0=self.parameters["w0"],
+                astropy_conv=False,
+            )
+        elif self.cosmo_model == "w0waflatLCDM":
+            cosmo = _w0waflatLCDM(
+                Omega_m=self.parameters["Om0"],
+                H0=self.parameters["H0"],
+                w0=self.parameters["w0"],
+                wa=self.parameters["wa"],
+                astropy_conv=False,
+            )
 
         # Initialize the rate evolution/ z prior for a set of parameters
         dic_rate = {ll: self.parameters[ll] for ll in self.list_rate_param}
@@ -179,20 +247,26 @@ class BBH_likelihood(_bilby.Likelihood):
         Neff = self.injections.calculate_Neff()
         # If the injections are not enough return 0, you cannot go to that point. This is done because the number of injections that you have
         # are not enough to calculate the selection effect
-        if Neff <= (4*len(self.posterior_samples_dict)):
+        if Neff <= (4 * len(self.posterior_samples_dict)):
             return float(_np.nan_to_num(-_np.inf))
 
         # Below we calculate the likelihood as indicated in Eq. 7 on the tex document, see below for the terms
         if self.parallel:
 
             ms1, ms2, z_samples = _detector_frame_to_source_frame(
-                cosmo, self.m1det_parallel, self.m2det_parallel, self.dl_parallel)
+                cosmo, self.m1det_parallel, self.m2det_parallel, self.dl_parallel
+            )
 
-            log_new_prior_term = mp_model.log_joint_prob(
-                ms1, ms2) + zp_model.log_prob(z_samples)
+            log_new_prior_term = mp_model.log_joint_prob(ms1, ms2) + zp_model.log_prob(
+                z_samples
+            )
             # We remove the original prior here.
-            log_jac_prior = _np.log(_np.abs(_detector_to_source_jacobian(
-                z_samples, cosmo, dl=self.dl_parallel))) + 2*_np.log(self.dl_parallel)
+            log_jac_prior = _np.log(
+                _np.abs(
+                    _detector_to_source_jacobian(
+                        z_samples, cosmo, dl=self.dl_parallel)
+                )
+            ) + 2 * _np.log(self.dl_parallel)
 
             # Selection effect, see Eq. 18 on paper
             beta = self.injections.gw_only_selection_effect()
@@ -201,15 +275,17 @@ class BBH_likelihood(_bilby.Likelihood):
             # Note that here we have no normalization on the number of samples as they all have the same amount
             # Eq. 13 on the tex document (the numerator)
             log_single_ev_array = _logsumexp(
-                log_new_prior_term - log_jac_prior, axis=1) - _np.log(log_new_prior_term.shape[1])
+                log_new_prior_term - log_jac_prior, axis=1
+            ) - _np.log(log_new_prior_term.shape[1])
 
             # Check for the number of effective sample
             log_sum_weights = log_single_ev_array + \
                 _np.log(log_new_prior_term.shape[1])
             log_sum_weights_squared = _logsumexp(
-                2*(log_new_prior_term-log_jac_prior), axis=1)
-            Neff_vect = _np.exp(2*log_sum_weights-log_sum_weights_squared)
-            Neff_vect[_np.isnan(Neff_vect)] = 0.
+                2 * (log_new_prior_term - log_jac_prior), axis=1
+            )
+            Neff_vect = _np.exp(2 * log_sum_weights - log_sum_weights_squared)
+            Neff_vect[_np.isnan(Neff_vect)] = 0.0
             if _np.any(Neff_vect < 20):
                 return float(_np.nan_to_num(-_np.inf))
 
@@ -221,10 +297,11 @@ class BBH_likelihood(_bilby.Likelihood):
             if self.scale_free:
                 log_poissonian_term = 0
             else:
-                R0 = self.parameters['R0']
+                R0 = self.parameters["R0"]
                 Nexp = self.injections.expected_number_detection(R0)
-                log_poissonian_term = len(
-                    self.posterior_samples_dict) * _np.log(Nexp) - Nexp
+                log_poissonian_term = (
+                    len(self.posterior_samples_dict) * _np.log(Nexp) - Nexp
+                )
 
             # Combine all the terms
             log_likeli = log_poissonian_term + log_numerator - log_denominator
@@ -233,7 +310,7 @@ class BBH_likelihood(_bilby.Likelihood):
             # python valye 1e-309
             if log_likeli == _np.inf:
                 raise ValueError(
-                    'LOG-likelihood must be smaller than infinite')
+                    "LOG-likelihood must be smaller than infinite")
 
             if _np.isnan(log_likeli):
                 log_likeli = float(_np.nan_to_num(-_np.inf))
@@ -250,25 +327,40 @@ class BBH_likelihood(_bilby.Likelihood):
             for event in list(self.posterior_samples_dict.keys()):
                 posterior_samples = self.posterior_samples_dict[event]
                 ms1, ms2, z_samples = _detector_frame_to_source_frame(
-                    cosmo, posterior_samples.mass_1_det, posterior_samples.mass_2_det, posterior_samples.distance)
+                    cosmo,
+                    posterior_samples.mass_1_det,
+                    posterior_samples.mass_2_det,
+                    posterior_samples.distance,
+                )
 
                 log_new_prior_term = mp_model.log_joint_prob(
-                    ms1, ms2) + zp_model.log_prob(z_samples)
+                    ms1, ms2
+                ) + zp_model.log_prob(z_samples)
                 # There is a normalization term there on dl.
-                log_jac_prior = _np.log(_np.abs(_detector_to_source_jacobian(
-                    z_samples, cosmo, dl=posterior_samples.distance))) + 2 * _np.log(posterior_samples.distance)
-                log_numerator = self.ln_evidences[i] + _logsumexp(
-                    log_new_prior_term - log_jac_prior) - _np.log(len(posterior_samples.mass_1_det))
+                log_jac_prior = _np.log(
+                    _np.abs(
+                        _detector_to_source_jacobian(
+                            z_samples, cosmo, dl=posterior_samples.distance
+                        )
+                    )
+                ) + 2 * _np.log(posterior_samples.distance)
+                log_numerator = (
+                    self.ln_evidences[i]
+                    + _logsumexp(log_new_prior_term - log_jac_prior)
+                    - _np.log(len(posterior_samples.mass_1_det))
+                )
 
                 # Check for the number of effective sample
-                log_sum_weights = log_numerator - \
-                    self.ln_evidences[i] + \
-                    _np.log(len(posterior_samples.mass_1_det))
+                log_sum_weights = (
+                    log_numerator
+                    - self.ln_evidences[i]
+                    + _np.log(len(posterior_samples.mass_1_det))
+                )
                 log_sum_weights_squared = _logsumexp(
                     log_new_prior_term - log_jac_prior)
-                Neff_vect = _np.exp(2*log_sum_weights -
+                Neff_vect = _np.exp(2 * log_sum_weights -
                                     log_sum_weights_squared)
-                Neff_vect[_np.isnan(Neff_vect)] = 0.
+                Neff_vect[_np.isnan(Neff_vect)] = 0.0
                 if _np.any(Neff_vect < 20):
                     return float(_np.nan_to_num(-_np.inf))
 
@@ -278,16 +370,17 @@ class BBH_likelihood(_bilby.Likelihood):
             if self.scale_free:
                 log_poissonian_term = 0
             else:
-                R0 = self.parameters['R0']
+                R0 = self.parameters["R0"]
                 Nexp = self.injections.expected_number_detection(R0)
-                log_poissonian_term = len(
-                    self.posterior_samples_dict) * _np.log(Nexp) - Nexp
+                log_poissonian_term = (
+                    len(self.posterior_samples_dict) * _np.log(Nexp) - Nexp
+                )
 
             log_likeli = _np.sum(log_likeli) + log_poissonian_term
 
             if log_likeli == _np.inf:
                 raise ValueError(
-                    'LOG-likelihood must be smaller than infinite')
+                    "LOG-likelihood must be smaller than infinite")
 
             if _np.isnan(log_likeli):
                 log_likeli = float(_np.nan_to_num(-_np.inf))
@@ -298,8 +391,15 @@ class BBH_likelihood(_bilby.Likelihood):
 
 
 class BBH_likelihood2(_bilby.Likelihood):
-
-    def __init__(self, posterior_samples_dict, injections, population_model, cosmo_model, parallel=2000, fixed_cosmo=False):
+    def __init__(
+        self,
+        posterior_samples_dict,
+        injections,
+        population_model,
+        cosmo_model,
+        parallel=2000,
+        fixed_cosmo=False,
+    ):
 
         # Some initialization below
         self.population_model = population_model
@@ -312,59 +412,155 @@ class BBH_likelihood2(_bilby.Likelihood):
 
         # In this loop we build the matrix of posteriro samples if we  are runnig with the parallel mode
         if parallel is not None:
-            len_samples = [len(self.posterior_samples_dict[event].distance)
-                           for event in list(self.posterior_samples_dict.keys())]
+            len_samples = [
+                len(self.posterior_samples_dict[event].distance)
+                for event in list(self.posterior_samples_dict.keys())
+            ]
             n_min = _np.min(len_samples)
             n_min = _np.min([n_min, parallel])
             n_ev = len(posterior_samples_dict)
 
+            self.n_min = n_min
+            self.n_ev = n_ev
+
             self.dl_parallel = _np.zeros([n_ev, n_min])
             self.m1det_parallel = _np.zeros([n_ev, n_min])
             self.m2det_parallel = _np.zeros([n_ev, n_min])
-            print('Using the parallel mode with {:d} samples'.format(n_min))
+            print("Using the parallel mode with {:d} samples".format(n_min))
 
             for i, event in enumerate(list(self.posterior_samples_dict.keys())):
                 len_single = len(self.posterior_samples_dict[event].distance)
                 rand_perm = _np.random.permutation(len_single)
 
-                self.dl_parallel[i,
-                                 :] = self.posterior_samples_dict[event].distance[rand_perm[:n_min]]
-                self.m1det_parallel[i,
-                                    :] = self.posterior_samples_dict[event].mass_1_det[rand_perm[:n_min]]
-                self.m2det_parallel[i,
-                                    :] = self.posterior_samples_dict[event].mass_2_det[rand_perm[:n_min]]
+                self.dl_parallel[i, :] = self.posterior_samples_dict[event].distance[
+                    rand_perm[:n_min]
+                ]
+                self.m1det_parallel[i, :] = self.posterior_samples_dict[
+                    event
+                ].mass_1_det[rand_perm[:n_min]]
+                self.m2det_parallel[i, :] = self.posterior_samples_dict[
+                    event
+                ].mass_2_det[rand_perm[:n_min]]
 
         # The lines below simply save a list of the parameters for the different population and cosmology models.
-        if population_model == 'BBH-mass_powerlaw-z_powerlaw':
+        if population_model == "BBH-mass_powerlaw-z_powerlaw":
             self.list_population_param = [
-                'alpha', 'mmin', 'mmax', 'beta', 'gamma', "R0"]
-        elif population_model == 'BBH-powerlaw-gaussian':
+                "alpha",
+                "mmin",
+                "mmax",
+                "beta",
+                "gamma",
+                "R0",
+            ]
+        elif population_model == "BBH-powerlaw-gaussian":
             self.list_population_param = [
-                'alpha', 'mmin', 'mmax', 'beta', 'mu_g', 'sigma_g', 'lambda_peak', 'delta_m']
-        elif population_model == 'BBH-broken-powerlaw':
-            self.list_population_param = ['alpha_1', 'alpha_2',
-                                          'mmin', 'mmax', 'beta', 'b', 'delta_m']
-        elif population_model == 'BBH-powerlaw-double-gaussian':
-            self.list_population_param = ['alpha', 'mmin', 'mmax', 'beta', 'mu_g_low', 'sigma_g_low',
-                                          'mu_g_high', 'sigma_g_high', 'lambda_g', 'lambda_g_low', 'delta_m']
-        elif population_model in ["PBH-lognormal", "PBH-lognormal-1st", "PBH-lognormal-2nd"]:
-            self.list_population_param = ['mc', 'σc', 'log_fpbh']
-        elif population_model in ["PBH-power-1st", "PBH-power-2nd"]:
-            self.list_population_param = ['α', 'M', 'log_fpbh']
-        elif population_model in ["PBH-CC-1st", "PBH-CC-2nd"]:
-            self.list_population_param = ['α', 'Mf', 'log_fpbh']
-        elif population_model in ["PBH-bpower-1st", "PBH-bpower-2nd"]:
-            self.list_population_param = ['ms', 'α1', 'α2', 'log_fpbh']
+                "alpha",
+                "mmin",
+                "mmax",
+                "beta",
+                "mu_g",
+                "sigma_g",
+                "lambda_peak",
+                "delta_m",
+            ]
+        elif population_model == "BBH-broken-powerlaw":
+            self.list_population_param = [
+                "alpha_1",
+                "alpha_2",
+                "mmin",
+                "mmax",
+                "beta",
+                "b",
+                "delta_m",
+            ]
+        elif population_model == "BBH-powerlaw-double-gaussian":
+            self.list_population_param = [
+                "alpha",
+                "mmin",
+                "mmax",
+                "beta",
+                "mu_g_low",
+                "sigma_g_low",
+                "mu_g_high",
+                "sigma_g_high",
+                "lambda_g",
+                "lambda_g_low",
+                "delta_m",
+            ]
+        elif population_model == "PBH-lognormal_BBH-mass_powerlaw_gaussian-z_madau":
+            self.list_population_param = [
+                "mc",
+                "σc",
+                "log_fpbh",
+                "alpha",
+                "mmin",
+                "mmax",
+                "beta",
+                "mu_g",
+                "sigma_g",
+                "lambda_peak",
+                "delta_m",
+                "gamma",
+                "zp",
+                "kappa",
+                "R0_abh",
+            ]
+        elif population_model == "BBH-mass_powerlaw_gaussian-z_madau":
+            self.list_population_param = [
+                "alpha",
+                "mmin",
+                "mmax",
+                "beta",
+                "mu_g",
+                "sigma_g",
+                "lambda_peak",
+                "delta_m",
+                "gamma",
+                "zp",
+                "kappa",
+                "R0_abh",
+            ]
+        elif population_model == "v_BBH-mass_powerlaw_gaussian-z_madau":
+            self.list_population_param = [
+                "alpha",
+                "mmin",
+                "mmax",
+                "beta",
+                "mu_g",
+                "sigma_g",
+                "lambda_peak",
+                "delta_m",
+                "gamma",
+                "zp",
+                "kappa",
+                "R0_abh",
+                "log_v0"
+            ]
 
-        if cosmo_model in ['flatLCDM', 'fixed-flatLCDM', 'restricted-flatLCDM']:
-            self.cosmo_model = 'flatLCDM'
-            self.list_cosmo_param = ['H0', 'Om0']
-        elif cosmo_model == 'w0flatLCDM':
-            self.list_cosmo_param = ['H0', 'Om0', 'w0']
-        elif cosmo_model == 'w0waflatLCDM':
-            self.list_cosmo_param = ['H0', 'Om0', 'w0', 'wa']
+        elif population_model in [
+            "PBH-lognormal",
+            "PBH-lognormal-1st",
+            "PBH-lognormal-2nd",
+        ]:
+            self.list_population_param = ["mc", "σc", "log_fpbh"]
+        elif population_model in ["PBH-power-1st", "PBH-power-2nd"]:
+            self.list_population_param = ["α", "M", "log_fpbh"]
+        elif population_model in ["PBH-CC-1st", "PBH-CC-2nd"]:
+            self.list_population_param = ["α", "Mf", "log_fpbh"]
+        elif population_model in ["PBH-bpower-1st", "PBH-bpower-2nd"]:
+            self.list_population_param = ["ms", "α1", "α2", "log_fpbh"]
+        elif population_model in ["DW"]:
+            self.list_population_param = ["α0", "m0", "λχ0", "Φ0", "log_fpbh"]
+
+        if cosmo_model in ["flatLCDM", "fixed-flatLCDM", "restricted-flatLCDM"]:
+            self.cosmo_model = "flatLCDM"
+            self.list_cosmo_param = ["H0", "Om0"]
+        elif cosmo_model == "w0flatLCDM":
+            self.list_cosmo_param = ["H0", "Om0", "w0"]
+        elif cosmo_model == "w0waflatLCDM":
+            self.list_cosmo_param = ["H0", "Om0", "w0", "wa"]
         else:
-            print('Not yet implemented')
+            print("Not yet implemented")
             _sys.exit()
 
         # Save the total list of parameters
@@ -374,35 +570,50 @@ class BBH_likelihood2(_bilby.Likelihood):
         super().__init__(parameters={ll: None for ll in tot_list})
 
     def log_likelihood(self):
-        '''
+        """
         Evaluates and return the log-likelihood
-        '''
+        """
 
         # Initialize the cosmology for a set of parametrs
         if (not self.fixed_cosmo) or (not self.update_cosmo):
-            if self.cosmo_model == 'flatLCDM':
+            if self.cosmo_model == "flatLCDM":
                 self.cosmo = _flatLCDM(
-                    Omega_m=self.parameters['Om0'], H0=self.parameters['H0'], astropy_conv=False)
-            elif self.cosmo_model == 'w0flatLCDM':
-                self.cosmo = _w0flatLCDM(Omega_m=self.parameters['Om0'], H0=self.parameters['H0'],
-                                         w0=self.parameters['w0'], astropy_conv=False)
-            elif self.cosmo_model == 'w0waflatLCDM':
-                self.cosmo = _w0waflatLCDM(Omega_m=self.parameters['Om0'], H0=self.parameters['H0'],
-                                           w0=self.parameters['w0'], wa=self.parameters['wa'], astropy_conv=False)
+                    Omega_m=self.parameters["Om0"],
+                    H0=self.parameters["H0"],
+                    astropy_conv=False,
+                )
+            elif self.cosmo_model == "w0flatLCDM":
+                self.cosmo = _w0flatLCDM(
+                    Omega_m=self.parameters["Om0"],
+                    H0=self.parameters["H0"],
+                    w0=self.parameters["w0"],
+                    astropy_conv=False,
+                )
+            elif self.cosmo_model == "w0waflatLCDM":
+                self.cosmo = _w0waflatLCDM(
+                    Omega_m=self.parameters["Om0"],
+                    H0=self.parameters["H0"],
+                    w0=self.parameters["w0"],
+                    wa=self.parameters["wa"],
+                    astropy_conv=False,
+                )
 
             self.injections.cosmo_update(self.cosmo)
             self.ms1, self.ms2, self.z_samples = _detector_frame_to_source_frame(
-                self.cosmo, self.m1det_parallel, self.m2det_parallel, self.dl_parallel)
+                self.cosmo, self.m1det_parallel, self.m2det_parallel, self.dl_parallel
+            )
 
             self.update_cosmo = True
 
         # initialization of the mass prior for a given set of parameters
-        dic = {ll: self.parameters[ll] for ll in self.list_population_param}
-        population = _population_prior(
-            name=self.population_model, cosmo=self.cosmo, hyper_params_dict=dic)
+        self.dic = {ll: self.parameters[ll]
+                    for ll in self.list_population_param}
+        self.population = _population_prior(
+            name=self.population_model, cosmo=self.cosmo, hyper_params_dict=self.dic
+        )
 
         # Update the sensitivity estimation with the new model
-        self.injections.update_VT(population, self.cosmo)
+        self.injections.update_VT(self.population, self.cosmo)
 
         # Neff = self.injections.calculate_Neff()
         # # If the injections are not enough return 0, you cannot go to that point. This is done because the number of injections that you have
@@ -413,17 +624,32 @@ class BBH_likelihood2(_bilby.Likelihood):
         # Below we calculate the likelihood as indicated in Eq. 7 on the tex document, see below for the terms
         if self.parallel:
 
-            log_new_prior_term = population.log_prob(
-                self.ms1, self.ms2, self.z_samples)
+            if self.population_model == "v_BBH-mass_powerlaw_gaussian-z_madau":
+                v0 = 10 ** self.parameters["log_v0"]
+                vs = 1 + get_z_doppler(v0, self.n_ev, self.n_min)
+                ms1 = self.ms1 / vs
+                ms2 = self.ms2 / vs
+            else:
+                ms1 = self.ms1
+                ms2 = self.ms2
+
+            log_new_prior_term = self.population.log_prob(
+                ms1, ms2, self.z_samples)
 
             # We remove the original prior here.
-            log_jac_prior = _np.log(_np.abs(_detector_to_source_jacobian(
-                self.z_samples, self.cosmo, dl=self.dl_parallel))) + 2*_np.log(self.dl_parallel)
+            log_jac_prior = _np.log(
+                _np.abs(
+                    _detector_to_source_jacobian(
+                        self.z_samples, self.cosmo, dl=self.dl_parallel
+                    )
+                )
+            ) + 2 * _np.log(self.dl_parallel)
 
             # Note that here we have no normalization on the number of samples as they all have the same amount
             # Eq. 13 on the tex document (the numerator)
             log_single_ev_array = _logsumexp(
-                log_new_prior_term - log_jac_prior, axis=1) - _np.log(log_new_prior_term.shape[1])
+                log_new_prior_term - log_jac_prior, axis=1
+            ) - _np.log(log_new_prior_term.shape[1])
 
             # Calculate the numerator and denominator in Eq. 7 on the tex document  for each event and multiply them
             log_numerator = _np.sum(log_single_ev_array)
@@ -441,7 +667,7 @@ class BBH_likelihood2(_bilby.Likelihood):
             # python valye 1e-309
             if log_likeli == _np.inf:
                 raise ValueError(
-                    'LOG-likelihood must be smaller than infinite')
+                    "LOG-likelihood must be smaller than infinite")
 
             if _np.isnan(log_likeli):
                 log_likeli = float(_np.nan_to_num(-_np.inf))
@@ -451,7 +677,7 @@ class BBH_likelihood2(_bilby.Likelihood):
         return log_likeli
 
 
-class hierarchical_analysis():
+class hierarchical_analysis:
     """
     Class to manage and perform population analysis with a set of events.
 
@@ -470,7 +696,9 @@ class hierarchical_analysis():
         self.injections = injections
         self.scale_free = scale_free
 
-    def run_analysis_on_lists(self, list_pop_models, list_z_models, subset=None, z_em=None):
+    def run_analysis_on_lists(
+        self, list_pop_models, list_z_models, subset=None, z_em=None
+    ):
         """
         This method perform an hiererchical analysis over a list of cosmological, mass and redshift models.
         It returns a dictionary of single posterior (not normalized) for each event. Each posterior has on the x-axis
@@ -491,10 +719,10 @@ class hierarchical_analysis():
         """
 
         # Check if the population and mass models are of the same lenght
-        check_condition = (len(list_pop_models) != len(list_z_models))
+        check_condition = len(list_pop_models) != len(list_z_models)
 
         if check_condition:
-            raise ValueError('The lenght of the models list must be the same')
+            raise ValueError("The lenght of the models list must be the same")
 
         if subset is not None:
             analysis_events = subset
@@ -511,7 +739,8 @@ class hierarchical_analysis():
             kde_distance = {}
             for event in analysis_events:
                 kde_distance[event] = _gaussian_kde(
-                    self.pos_samples_dict[event].distance)
+                    self.pos_samples_dict[event].distance
+                )
 
         # Run the analysis, calculate posterior basically, for each of the models provided event by event
         bar = progressbar.ProgressBar()
@@ -528,47 +757,75 @@ class hierarchical_analysis():
                 # Numerator of the hierarchical likelihood as in Eq. 13 on the tex document
                 posterior_samples = self.pos_samples_dict[event]
                 ms1, ms2, z_samples = _detector_frame_to_source_frame(
-                    cosmology, posterior_samples.mass_1_det, posterior_samples.mass_2_det, posterior_samples.distance)
+                    cosmology,
+                    posterior_samples.mass_1_det,
+                    posterior_samples.mass_2_det,
+                    posterior_samples.distance,
+                )
                 if z_em is None:
                     log_new_prior_term = mp_model.log_joint_prob(
-                        ms1, ms2)+zp_model.log_prob(z_samples)
-                    log_jac_prior = _np.log(_np.abs(_detector_to_source_jacobian(
-                        z_samples, cosmology, dl=posterior_samples.distance)))+2*_np.log(posterior_samples.distance)
+                        ms1, ms2
+                    ) + zp_model.log_prob(z_samples)
+                    log_jac_prior = _np.log(
+                        _np.abs(
+                            _detector_to_source_jacobian(
+                                z_samples, cosmology, dl=posterior_samples.distance
+                            )
+                        )
+                    ) + 2 * _np.log(posterior_samples.distance)
                     log_numerator = _logsumexp(
-                        log_new_prior_term-log_jac_prior)-_np.log(len(posterior_samples.mass_1_det))
+                        log_new_prior_term - log_jac_prior
+                    ) - _np.log(len(posterior_samples.mass_1_det))
                     log_denominator = _np.log(beta)
                     log_single_posterior[event][i] = log_numerator - \
                         log_denominator
                 else:
                     if z_em[event] is None:
                         log_new_prior_term = mp_model.log_joint_prob(
-                            ms1, ms2)+zp_model.log_prob(z_samples)
-                        log_jac_prior = _np.log(_np.abs(_detector_to_source_jacobian(
-                            z_samples, cosmology, dl=posterior_samples.distance)))+2*_np.log(posterior_samples.distance)
+                            ms1, ms2
+                        ) + zp_model.log_prob(z_samples)
+                        log_jac_prior = _np.log(
+                            _np.abs(
+                                _detector_to_source_jacobian(
+                                    z_samples, cosmology, dl=posterior_samples.distance
+                                )
+                            )
+                        ) + 2 * _np.log(posterior_samples.distance)
                         log_numerator = _logsumexp(
-                            log_new_prior_term-log_jac_prior)-_np.log(len(posterior_samples.mass_1_det))
+                            log_new_prior_term - log_jac_prior
+                        ) - _np.log(len(posterior_samples.mass_1_det))
                         log_denominator = _np.log(beta)
                         log_single_posterior[event][i] = log_numerator - \
                             log_denominator
                     else:
                         mass_weight = _np.sum(
-                            mp_model.joint_prob(ms1, ms2))/len(ms1)
-                        distance_weight = _np.sum(kde_distance[event](cosmology.dl_at_z(z_em[event]))*_np.power(cosmology.dl_at_z(
-                            z_em[event]), -2.)*zp_model.prob(z_em[event])*_np.power(1+z_em[event], -2.))/len(z_em[event])
-                        log_single_posterior[event][i] = _np.log(
-                            distance_weight)+_np.log(mass_weight)-log_denominator
+                            mp_model.joint_prob(ms1, ms2)) / len(ms1)
+                        distance_weight = _np.sum(
+                            kde_distance[event](cosmology.dl_at_z(z_em[event]))
+                            * _np.power(cosmology.dl_at_z(z_em[event]), -2.0)
+                            * zp_model.prob(z_em[event])
+                            * _np.power(1 + z_em[event], -2.0)
+                        ) / len(z_em[event])
+                        log_single_posterior[event][i] = (
+                            _np.log(distance_weight)
+                            + _np.log(mass_weight)
+                            - log_denominator
+                        )
 
                 if _np.isnan(log_single_posterior[event][i]):
                     log_single_posterior[event][i] = float(
                         _np.nan_to_num(-np.inf))
                 else:
                     log_single_posterior[event][i] = float(
-                        _np.nan_to_num(log_single_posterior[event][i]))
+                        _np.nan_to_num(log_single_posterior[event][i])
+                    )
 
         return log_single_posterior
 
-    def run_bilby(self, mass_model, cosmo_model, rate_model, prior_dict, parallel=10000, **kwargs):
-        '''
+    def run_bilby(
+        self, mass_model, cosmo_model, rate_model, prior_dict, parallel=10000, **kwargs
+    ):
+        """
         This method run Bilby to sample the hierarchical posteirior
 
         Parameters
@@ -587,17 +844,24 @@ class hierarchical_analysis():
         Returns
         -------
         result: Bilby result object
-        '''
+        """
 
         # Calls bilby routines to evaluate the prior.
-        likeli = BBH_likelihood(self.pos_samples_dict, self.injections, mass_model=mass_model,
-                                cosmo_model=cosmo_model, rate_model=rate_model, parallel=parallel, scale_free=self.scale_free)
+        likeli = BBH_likelihood(
+            self.pos_samples_dict,
+            self.injections,
+            mass_model=mass_model,
+            cosmo_model=cosmo_model,
+            rate_model=rate_model,
+            parallel=parallel,
+            scale_free=self.scale_free,
+        )
         result = _bilby.run_sampler(
             likelihood=likeli, priors=prior_dict, **kwargs)
         return result
 
 
-class hierarchical_analysis2():
+class hierarchical_analysis2:
     """
     Class to manage and perform population analysis with a set of events.
 
@@ -616,8 +880,10 @@ class hierarchical_analysis2():
         self.injections = injections
         self.fixed_cosmo = fixed_cosmo
 
-    def run_bilby(self, population_model, cosmo_model, prior_dict, parallel=2000, **kwargs):
-        '''
+    def run_bilby(
+        self, population_model, cosmo_model, prior_dict, parallel=2000, **kwargs
+    ):
+        """
         This method run Bilby to sample the hierarchical posteirior
 
         Parameters
@@ -636,12 +902,18 @@ class hierarchical_analysis2():
         Returns
         -------
         result: Bilby result object
-        '''
+        """
 
         # Calls bilby routines to evaluate the prior.
 
         self.likeli = BBH_likelihood2(
-            self.pos_samples_dict, self.injections, population_model, cosmo_model, parallel=parallel, fixed_cosmo=self.fixed_cosmo)
+            self.pos_samples_dict,
+            self.injections,
+            population_model,
+            cosmo_model,
+            parallel=parallel,
+            fixed_cosmo=self.fixed_cosmo,
+        )
         result = _bilby.run_sampler(
             likelihood=self.likeli, priors=prior_dict, **kwargs)
         return result

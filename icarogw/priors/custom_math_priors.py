@@ -1,6 +1,6 @@
-'''
+"""
 This module collects analytical and numerical probability density functions.
-'''
+"""
 
 import numpy as _np
 from scipy.stats import truncnorm as _truncnorm
@@ -12,7 +12,7 @@ from scipy.integrate import cumtrapz as _cumtrapz
 
 
 def _S_factor(mass, mmin, delta_m):
-    '''
+    """
     This function return the value of the window function defined as Eqs B6 and B7 of https://arxiv.org/pdf/2010.14533.pdf
 
     Parameters
@@ -27,7 +27,7 @@ def _S_factor(mass, mmin, delta_m):
     Returns
     -------
     Values of the window function
-    '''
+    """
 
     if not isinstance(mass, _np.ndarray):
         mass = _np.array([mass])
@@ -36,26 +36,30 @@ def _S_factor(mass, mmin, delta_m):
     if delta_m == 0:
         return to_ret
 
-    mprime = mass-mmin
+    mprime = mass - mmin
 
     # Defines the different regions of thw window function ad in Eq. B6 of  https://arxiv.org/pdf/2010.14533.pdf
-    select_window = (mass > mmin) & (mass < (delta_m+mmin))
-    select_one = mass >= (delta_m+mmin)
+    select_window = (mass > mmin) & (mass < (delta_m + mmin))
+    select_one = mass >= (delta_m + mmin)
     select_zero = mass <= mmin
 
     effe_prime = _np.ones_like(mass)
 
     # Definethe f function as in Eq. B7 of https://arxiv.org/pdf/2010.14533.pdf
-    effe_prime[select_window] = _np.exp(_np.nan_to_num(
-        (delta_m/mprime[select_window])+(delta_m/(mprime[select_window]-delta_m))))
-    to_ret = 1./(effe_prime+1)
-    to_ret[select_zero] = 0.
-    to_ret[select_one] = 1.
+    effe_prime[select_window] = _np.exp(
+        _np.nan_to_num(
+            (delta_m / mprime[select_window])
+            + (delta_m / (mprime[select_window] - delta_m))
+        )
+    )
+    to_ret = 1.0 / (effe_prime + 1)
+    to_ret[select_zero] = 0.0
+    to_ret[select_one] = 1.0
     return to_ret
 
 
 def get_PL_norm(alpha, minv, maxv):
-    '''
+    """
     This function returns the powerlaw normalization factor
 
     Parameters
@@ -66,17 +70,17 @@ def get_PL_norm(alpha, minv, maxv):
         lower cutoff
     maxv: float
         upper cutoff
-    '''
+    """
 
     # Get the PL norm as in Eq. 24 on the tex document
     if alpha == -1:
-        return _np.log(maxv/minv)
+        return _np.log(maxv / minv)
     else:
-        return (_np.power(maxv, alpha+1) - _np.power(minv, alpha+1))/(alpha+1)
+        return (_np.power(maxv, alpha + 1) - _np.power(minv, alpha + 1)) / (alpha + 1)
 
 
 def get_gaussian_norm(mu, sigma, minv, maxv):
-    '''
+    """
     This function returns the gaussian normalization factor
 
     Parameters
@@ -89,16 +93,16 @@ def get_gaussian_norm(mu, sigma, minv, maxv):
         lower cutoff
     maxv: float
         upper cutoff
-    '''
+    """
 
     # Get the gaussian norm as in Eq. 28 on the tex document
-    max_point = (maxv-mu)/(sigma*_np.sqrt(2.))
-    min_point = (minv-mu)/(sigma*_np.sqrt(2.))
-    return 0.5*_erf(max_point)-0.5*_erf(min_point)
+    max_point = (maxv - mu) / (sigma * _np.sqrt(2.0))
+    min_point = (minv - mu) / (sigma * _np.sqrt(2.0))
+    return 0.5 * _erf(max_point) - 0.5 * _erf(min_point)
 
 
 class SmoothedProb(object):
-    '''
+    """
     Class for smoothing the low part of a PDF. The smoothing follows Eq. B7 of
     2010.14533.
 
@@ -110,7 +114,7 @@ class SmoothedProb(object):
         minimum cut-off. Below this, the window is 0.
     bottom_smooth: float
         smooth factor. The smoothing acts between bottom and bottom+bottom_smooth
-    '''
+    """
 
     def __init__(self, origin_prob, bottom, bottom_smooth):
 
@@ -121,10 +125,8 @@ class SmoothedProb(object):
         self.minimum = self.origin_prob.minimum
 
         # Find the values of the integrals in the region of the window function before and after the smoothing
-        int_array = _np.linspace(
-            self.origin_prob.minimum, bottom+bottom_smooth, 1000)
-        integral_before = _np.trapz(
-            self.origin_prob.prob(int_array), int_array)
+        int_array = _np.linspace(self.origin_prob.minimum, bottom + bottom_smooth, 1000)
+        integral_before = _np.trapz(self.origin_prob.prob(int_array), int_array)
         integral_now = _np.trapz(self.prob(int_array), int_array)
 
         self.integral_before = integral_before
@@ -133,10 +135,16 @@ class SmoothedProb(object):
         self.norm = 1 - integral_before + integral_now
 
         x_eval = _np.logspace(
-            _np.log10(bottom), _np.log10(bottom+bottom_smooth), 1000)
+            _np.log10(bottom), _np.log10(bottom + bottom_smooth), 1000
+        )
         cdf_numeric = _cumtrapz(self.prob(x_eval), x_eval)
         self.cached_cdf_window = _interp1d(
-            x_eval[:-1:], cdf_numeric, fill_value='extrapolate', bounds_error=False, kind='cubic')
+            x_eval[:-1:],
+            cdf_numeric,
+            fill_value="extrapolate",
+            bounds_error=False,
+            kind="cubic",
+        )
 
     def prob(self, x):
         """
@@ -163,11 +171,12 @@ class SmoothedProb(object):
         # Return the window function
         window = _S_factor(x, self.bottom, self.bottom_smooth)
 
-        if hasattr(self, 'norm'):
-            prob_ret = self.origin_prob.log_prob(
-                x)+_np.log(window)-_np.log(self.norm)
+        if hasattr(self, "norm"):
+            prob_ret = (
+                self.origin_prob.log_prob(x) + _np.log(window) - _np.log(self.norm)
+            )
         else:
-            prob_ret = self.origin_prob.log_prob(x)+_np.log(window)
+            prob_ret = self.origin_prob.log_prob(x) + _np.log(window)
 
         return prob_ret
 
@@ -187,7 +196,7 @@ class SmoothedProb(object):
 
         to_ret = self.log_prob(x)
         # Find the new normalization in the new interval
-        new_norm = self.cdf(b)-self.cdf(a)
+        new_norm = self.cdf(b) - self.cdf(a)
         # Apply the new normalization and put to zero all the values above/below the interval
         to_ret -= _np.log(new_norm)
         to_ret[(x < a) | (x > b)] = -_np.inf
@@ -205,11 +214,17 @@ class SmoothedProb(object):
         """
 
         to_ret = _np.ones_like(x)
-        to_ret[x < self.bottom] = 0.
-        to_ret[(x >= self.bottom) & (x <= (self.bottom+self.bottom_smooth))
-               ] = self.cached_cdf_window(x[(x >= self.bottom) & (x <= (self.bottom+self.bottom_smooth))])
-        to_ret[x >= (self.bottom+self.bottom_smooth)] = (self.integral_now+self.origin_prob.cdf(
-            x[x >= (self.bottom+self.bottom_smooth)])-self.origin_prob.cdf(self.bottom+self.bottom_smooth))/self.norm
+        to_ret[x < self.bottom] = 0.0
+        to_ret[
+            (x >= self.bottom) & (x <= (self.bottom + self.bottom_smooth))
+        ] = self.cached_cdf_window(
+            x[(x >= self.bottom) & (x <= (self.bottom + self.bottom_smooth))]
+        )
+        to_ret[x >= (self.bottom + self.bottom_smooth)] = (
+            self.integral_now
+            + self.origin_prob.cdf(x[x >= (self.bottom + self.bottom_smooth)])
+            - self.origin_prob.cdf(self.bottom + self.bottom_smooth)
+        ) / self.norm
 
         return to_ret
 
@@ -278,7 +293,7 @@ class PowerLaw_math(object):
             Value at which compute the probability
         """
 
-        to_ret = self.alpha*_np.log(x) - _np.log(self.norm)
+        to_ret = self.alpha * _np.log(x) - _np.log(self.norm)
         to_ret[(x < self.min_pl) | (x > self.max_pl)] = -_np.inf
 
         return to_ret
@@ -298,7 +313,7 @@ class PowerLaw_math(object):
         """
 
         norms = get_PL_norm(self.alpha, a, b)
-        to_ret = self.alpha*_np.log(x) - _np.log(norms)
+        to_ret = self.alpha * _np.log(x) - _np.log(norms)
         to_ret[(x < a) | (x > b)] = -_np.inf
 
         return to_ret
@@ -316,18 +331,20 @@ class PowerLaw_math(object):
         # Define the cumulative density function, see  Eq. 24 to see the integral form
 
         if self.alpha == -1:
-            to_ret = _np.log(x/self.min_pl)/self.norm
+            to_ret = _np.log(x / self.min_pl) / self.norm
         else:
-            to_ret = ((_np.power(x, self.alpha+1)-_np.power(self.min_pl,
-                      self.alpha+1))/(self.alpha+1))/self.norm
+            to_ret = (
+                (_np.power(x, self.alpha + 1) - _np.power(self.min_pl, self.alpha + 1))
+                / (self.alpha + 1)
+            ) / self.norm
 
-        to_ret *= (x >= self.min_pl)
+        to_ret *= x >= self.min_pl
 
         if hasattr(x, "__len__"):
-            to_ret[x > self.max_pl] = 1.
+            to_ret[x > self.max_pl] = 1.0
         else:
             if x > self.max_pl:
-                to_ret = 1.
+                to_ret = 1.0
 
         return to_ret
 
@@ -399,8 +416,12 @@ class Truncated_Gaussian_math(object):
             Value at which compute the probability
         """
 
-        to_ret = -_np.log(self.sigma)-0.5*_np.log(2*_np.pi)-0.5 * \
-            _np.power((x-self.mu)/self.sigma, 2.)-_np.log(self.norm)
+        to_ret = (
+            -_np.log(self.sigma)
+            - 0.5 * _np.log(2 * _np.pi)
+            - 0.5 * _np.power((x - self.mu) / self.sigma, 2.0)
+            - _np.log(self.norm)
+        )
         to_ret[(x < self.min_g) | (x > self.max_g)] = -_np.inf
 
         return to_ret
@@ -420,8 +441,12 @@ class Truncated_Gaussian_math(object):
         """
 
         norms = get_gaussian_norm(self.mu, self.sigma, a, b)
-        to_ret = -_np.log(self.sigma)-0.5*_np.log(2*_np.pi) - \
-            0.5*_np.power((x-self.mu)/self.sigma, 2.)-_np.log(norms)
+        to_ret = (
+            -_np.log(self.sigma)
+            - 0.5 * _np.log(2 * _np.pi)
+            - 0.5 * _np.power((x - self.mu) / self.sigma, 2.0)
+            - _np.log(norms)
+        )
         to_ret[(x < a) | (x > b)] = -_np.inf
 
         return to_ret
@@ -438,18 +463,18 @@ class Truncated_Gaussian_math(object):
 
         # Define the cumulative density function as in Eq. 28 on the paper to see the integral form
 
-        max_point = (x-self.mu)/(self.sigma*_np.sqrt(2.))
-        min_point = (self.min_g-self.mu)/(self.sigma*_np.sqrt(2.))
+        max_point = (x - self.mu) / (self.sigma * _np.sqrt(2.0))
+        min_point = (self.min_g - self.mu) / (self.sigma * _np.sqrt(2.0))
 
-        to_ret = (0.5*_erf(max_point)-0.5*_erf(min_point))/self.norm
+        to_ret = (0.5 * _erf(max_point) - 0.5 * _erf(min_point)) / self.norm
 
-        to_ret *= (x >= self.min_g)
+        to_ret *= x >= self.min_g
 
         if hasattr(x, "__len__"):
-            to_ret[x > self.max_g] = 1.
+            to_ret[x > self.max_g] = 1.0
         else:
             if x > self.max_g:
-                to_ret = 1.
+                to_ret = 1.0
 
         return to_ret
 
@@ -529,7 +554,7 @@ class PowerLawGaussian_math(object):
             Value at which compute the cumulative
         """
 
-        return (1-self.lambda_g)*self.pl.cdf(x)+self.lambda_g*self.gg.cdf(x)
+        return (1 - self.lambda_g) * self.pl.cdf(x) + self.lambda_g * self.gg.cdf(x)
 
     def conditioned_prob(self, x, a, b):
         """
@@ -558,7 +583,10 @@ class PowerLawGaussian_math(object):
         """
 
         # Define the PDF as in Eq. 36-37-38 on on the tex document
-        return _np.logaddexp(_np.log1p(-self.lambda_g)+self.pl.log_prob(x), _np.log(self.lambda_g)+self.gg.log_prob(x))
+        return _np.logaddexp(
+            _np.log1p(-self.lambda_g) + self.pl.log_prob(x),
+            _np.log(self.lambda_g) + self.gg.log_prob(x),
+        )
 
     def log_conditioned_prob(self, x, a, b):
         """
@@ -574,7 +602,10 @@ class PowerLawGaussian_math(object):
             New upper boundary
         """
 
-        return _np.logaddexp(_np.log1p(-self.lambda_g)+self.pl.log_conditioned_prob(x, a, b), _np.log(self.lambda_g)+self.gg.log_conditioned_prob(x, a, b))
+        return _np.logaddexp(
+            _np.log1p(-self.lambda_g) + self.pl.log_conditioned_prob(x, a, b),
+            _np.log(self.lambda_g) + self.gg.log_conditioned_prob(x, a, b),
+        )
 
 
 class PowerLawDoubleGaussian_math(object):
@@ -609,8 +640,20 @@ class PowerLawDoubleGaussian_math(object):
         maximim for the gaussian components
     """
 
-    def __init__(self, alpha, min_pl, max_pl, lambda_g, lambda_g_low,
-                 mean_g_low, sigma_g_low, mean_g_high, sigma_g_high, min_g, max_g):
+    def __init__(
+        self,
+        alpha,
+        min_pl,
+        max_pl,
+        lambda_g,
+        lambda_g_low,
+        mean_g_low,
+        sigma_g_low,
+        mean_g_high,
+        sigma_g_high,
+        min_g,
+        max_g,
+    ):
 
         self.minimum = _np.min([min_pl, min_g])
         self.maximum = _np.max([max_pl, max_g])
@@ -619,10 +662,8 @@ class PowerLawDoubleGaussian_math(object):
         self.lambda_g_low = lambda_g_low
 
         self.pl = PowerLaw_math(alpha, min_pl, max_pl)
-        self.gg_low = Truncated_Gaussian_math(
-            mean_g_low, sigma_g_low, min_g, max_g)
-        self.gg_high = Truncated_Gaussian_math(
-            mean_g_high, sigma_g_high, min_g, max_g)
+        self.gg_low = Truncated_Gaussian_math(mean_g_low, sigma_g_low, min_g, max_g)
+        self.gg_high = Truncated_Gaussian_math(mean_g_high, sigma_g_high, min_g, max_g)
 
     def prob(self, x):
         """
@@ -648,11 +689,17 @@ class PowerLawDoubleGaussian_math(object):
 
         # Define the PDF as in Eq. 44-45-46 on the tex document
 
-        pl_part = _np.log1p(-self.lambda_g)+self.pl.log_prob(x)
-        g_low = self.gg_low.log_prob(
-            x)+_np.log(self.lambda_g)+_np.log(self.lambda_g_low)
-        g_high = self.gg_high.log_prob(
-            x)+_np.log(self.lambda_g)+_np.log1p(-self.lambda_g_low)
+        pl_part = _np.log1p(-self.lambda_g) + self.pl.log_prob(x)
+        g_low = (
+            self.gg_low.log_prob(x)
+            + _np.log(self.lambda_g)
+            + _np.log(self.lambda_g_low)
+        )
+        g_high = (
+            self.gg_high.log_prob(x)
+            + _np.log(self.lambda_g)
+            + _np.log1p(-self.lambda_g_low)
+        )
 
         return _logsumexp(_np.stack([pl_part, g_low, g_high]), axis=0)
 
@@ -668,12 +715,17 @@ class PowerLawDoubleGaussian_math(object):
 
         # Define the PDF as in Eq.  44-45-46  on the tex document
 
-        pl_part = _np.log1p(-self.lambda_g) + \
-            self.pl.log_conditioned_prob(x, a, b)
-        g_low = self.gg_low.log_conditioned_prob(
-            x, a, b)+_np.log(self.lambda_g)+_np.log(self.lambda_g_low)
-        g_high = self.gg_high.log_conditioned_prob(
-            x, a, b)+_np.log(self.lambda_g)+_np.log1p(-self.lambda_g_low)
+        pl_part = _np.log1p(-self.lambda_g) + self.pl.log_conditioned_prob(x, a, b)
+        g_low = (
+            self.gg_low.log_conditioned_prob(x, a, b)
+            + _np.log(self.lambda_g)
+            + _np.log(self.lambda_g_low)
+        )
+        g_high = (
+            self.gg_high.log_conditioned_prob(x, a, b)
+            + _np.log(self.lambda_g)
+            + _np.log1p(-self.lambda_g_low)
+        )
 
         return _logsumexp(_np.stack([pl_part, g_low, g_high]), axis=0)
 
@@ -687,11 +739,14 @@ class PowerLawDoubleGaussian_math(object):
             Value at which compute the cumulative
         """
 
-        pl_part = (1-self.lambda_g)*self.pl.cdf(x)
-        g_part = self.gg_low.cdf(x)*self.lambda_g*self.lambda_g_low + \
-            self.gg_high.cdf(x)*self.lambda_g*(1-self.lambda_g_low)
+        pl_part = (1 - self.lambda_g) * self.pl.cdf(x)
+        g_part = self.gg_low.cdf(
+            x
+        ) * self.lambda_g * self.lambda_g_low + self.gg_high.cdf(x) * self.lambda_g * (
+            1 - self.lambda_g_low
+        )
 
-        return pl_part+g_part
+        return pl_part + g_part
 
     def conditioned_prob(self, x, a, b):
         """
@@ -741,7 +796,7 @@ class BrokenPowerLaw_math(object):
         self.alpha_2 = alpha_2
 
         # Define the breaking point as In Eq. 40
-        self.break_point = min_pl+b*(max_pl-min_pl)
+        self.break_point = min_pl + b * (max_pl - min_pl)
         self.b = b
 
         # Initialize the single powerlaws
@@ -749,8 +804,9 @@ class BrokenPowerLaw_math(object):
         self.pl2 = PowerLaw_math(alpha_2, self.break_point, max_pl)
 
         # Define the broken powerlaw as in Eq. 39-40-41-42 on the tex document
-        self.new_norm = (
-            1+self.pl1.prob(_np.array([self.break_point]))/self.pl2.prob(_np.array([self.break_point])))
+        self.new_norm = 1 + self.pl1.prob(
+            _np.array([self.break_point])
+        ) / self.pl2.prob(_np.array([self.break_point]))
 
     def prob(self, x):
         """
@@ -777,8 +833,12 @@ class BrokenPowerLaw_math(object):
 
         # Define the PDF as in Eq. 39-40-41 on the tex document
 
-        to_ret = _np.logaddexp(self.pl1.log_prob(x), self.pl2.log_prob(x)+self.pl1.log_prob(_np.array([self.break_point]))
-                               - self.pl2.log_prob(_np.array([self.break_point])))-_np.log(self.new_norm)
+        to_ret = _np.logaddexp(
+            self.pl1.log_prob(x),
+            self.pl2.log_prob(x)
+            + self.pl1.log_prob(_np.array([self.break_point]))
+            - self.pl2.log_prob(_np.array([self.break_point])),
+        ) - _np.log(self.new_norm)
         return to_ret
 
     def log_conditioned_prob(self, x, a, b):
@@ -793,8 +853,12 @@ class BrokenPowerLaw_math(object):
 
         # Define the PDF as in Eq. 39-40-41 on the tex document
 
-        to_ret = _np.logaddexp(self.pl1.log_conditioned_prob(x, a, b), self.pl2.log_conditioned_prob(x, a, b)
-                               + self.pl1.log_prob(_np.array([self.break_point]))-self.pl2.log_prob(_np.array([self.break_point])))-_np.log(self.new_norm)
+        to_ret = _np.logaddexp(
+            self.pl1.log_conditioned_prob(x, a, b),
+            self.pl2.log_conditioned_prob(x, a, b)
+            + self.pl1.log_prob(_np.array([self.break_point]))
+            - self.pl2.log_prob(_np.array([self.break_point])),
+        ) - _np.log(self.new_norm)
 
         return to_ret
 
@@ -808,7 +872,14 @@ class BrokenPowerLaw_math(object):
             Value at which compute the cumulative
         """
 
-        return (self.pl1.cdf(x)+self.pl2.cdf(x)*(self.pl1.prob(_np.array([self.break_point]))/self.pl2.prob(_np.array([self.break_point]))))/self.new_norm
+        return (
+            self.pl1.cdf(x)
+            + self.pl2.cdf(x)
+            * (
+                self.pl1.prob(_np.array([self.break_point]))
+                / self.pl2.prob(_np.array([self.break_point]))
+            )
+        ) / self.new_norm
 
     def conditioned_prob(self, x, a, b):
         """
