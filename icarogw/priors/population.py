@@ -10,7 +10,7 @@ from julia.api import Julia
 
 jl = Julia(compiled_modules=False)
 jl.eval(
-    'include("/home/czc/projects/working/pbh/merger_history_gw190521/code/merger_rate.jl")'
+    'include("/home/czc/projects/working/pbh/merger_history_GWTC3/code/merger_rate.jl")'
 )
 
 mergerRateDensity1st_log = jl.eval("mergerRateDensity1st_log")
