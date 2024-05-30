@@ -14,6 +14,7 @@ jl.eval(
 )
 
 mergerRateDensity_log = jl.eval("mergerRateDensity_log")
+mergerRateDensity_norm = jl.eval("mergerRateDensity_norm")
 # mergerRateDensity2nd_log = jl.eval("mergerRateDensity2nd_log")
 # mergerRateDensity1st_power = jl.eval("mergerRateDensity1st_power")
 # mergerRateDensity2nd_power = jl.eval("mergerRateDensity2nd_power")
@@ -35,22 +36,22 @@ def Pm_log(m, mc, σc):
     return 1 / (sqrt(2 * pi) * σc * m) * exp(exp_value)
 
 
-# def mergerRateDensity_log(mc, σc, log_fpbh, m1, m2):
-#     """See eq.(2) of https://arxiv.org/pdf/2108.11740v2.pdf"""
-#     fpbh = 10**log_fpbh
-#     σeq = 5e-3
-#     p10 = Pm_log(m1, mc, σc) / m1
-#     p20 = Pm_log(m2, mc, σc) / m2
+def mergerRateDensity_log(mc, σc, log_fpbh, m1, m2):
+    """See eq.(2) of https://arxiv.org/pdf/2108.11740v2.pdf"""
+    fpbh = 10**log_fpbh
+    σeq = 5e-3
+    p10 = Pm_log(m1, mc, σc) / m1
+    p20 = Pm_log(m2, mc, σc) / m2
 
-#     return (
-#         2.8e6
-#         * fpbh**2
-#         * (0.7 * fpbh**2 + σeq**2) ** (-21 / 74)
-#         * np.minimum(p10, p20)
-#         * (p10 + p20)
-#         * (m1 * m2) ** (3 / 37)
-#         * (m1 + m2) ** (36 / 37)
-#     )
+    return (
+        2.8e6
+        * fpbh**2
+        * (0.7 * fpbh**2 + σeq**2) ** (-21 / 74)
+        * np.minimum(p10, p20)
+        * (p10 + p20)
+        * (m1 * m2) ** (3 / 37)
+        * (m1 + m2) ** (36 / 37)
+    )
 
 
 class population_prior(object):
@@ -215,6 +216,19 @@ class population_prior(object):
 
             _zs = self.cosmo.t_at_z(zs) / self.cosmo.t_at_z(1e-4)
             R1 = _zs ** (-34.0 / 37.0) * mergerRateDensity_log(
+                mc, σc, log_fpbh, ms1, ms2
+            )
+            to_ret += _np.log(R1)
+        
+        elif self.name == "PBH-norm":
+            mc = hyper_params_dict["mc"]
+            σc = hyper_params_dict["σc"]
+            log_fpbh = hyper_params_dict["log_fpbh"]
+
+            to_ret = _np.log(self.cosmo.dVc_by_dz(zs)) - _np.log1p(zs)
+
+            _zs = self.cosmo.t_at_z(zs) / self.cosmo.t_at_z(1e-4)
+            R1 = _zs ** (-34.0 / 37.0) * mergerRateDensity_norm(
                 mc, σc, log_fpbh, ms1, ms2
             )
             to_ret += _np.log(R1)
