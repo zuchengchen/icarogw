@@ -66,7 +66,6 @@ class BBH_likelihood(_bilby.Likelihood):
         ln_evidences=None,
         scale_free=True,
     ):
-
         if mass_model not in [
             "BBH-powerlaw",
             "BBH-powerlaw-gaussian",
@@ -76,6 +75,7 @@ class BBH_likelihood(_bilby.Likelihood):
             "PBH-lognormal-nocut",
             "PBH-powerlaw",
             "PBH-powerlaw-nocut",
+            "PBH-bpowerlaw-nocut",
             "PBH-cc",
             "PBH-cc-nocut",
         ]:
@@ -171,6 +171,8 @@ class BBH_likelihood(_bilby.Likelihood):
             self.list_pop_param = ["α", "m_min", "m_max"]
         elif mass_model == "PBH-powerlaw-nocut":
             self.list_pop_param = ["α", "m_min"]
+        elif mass_model == "PBH-bpowerlaw-nocut":
+            self.list_pop_param = ["ms", "α1", "α2"]
         elif mass_model == "PBH-cc":
             self.list_pop_param = ["α", "Mf", "m_min", "m_max"]
         elif mass_model == "PBH-cc-nocut":
@@ -238,8 +240,7 @@ class BBH_likelihood(_bilby.Likelihood):
 
         # Initialize the rate evolution/ z prior for a set of parameters
         dic_rate = {ll: self.parameters[ll] for ll in self.list_rate_param}
-        zp_model = _redshift_prior(
-            cosmo, name=self.rate_model, dic_param=dic_rate)
+        zp_model = _redshift_prior(cosmo, name=self.rate_model, dic_param=dic_rate)
 
         # Update the sensitivity estimation with the new model
         self.injections.update_VT(mp_model, zp_model)
@@ -252,7 +253,6 @@ class BBH_likelihood(_bilby.Likelihood):
 
         # Below we calculate the likelihood as indicated in Eq. 7 on the tex document, see below for the terms
         if self.parallel:
-
             ms1, ms2, z_samples = _detector_frame_to_source_frame(
                 cosmo, self.m1det_parallel, self.m2det_parallel, self.dl_parallel
             )
@@ -263,8 +263,7 @@ class BBH_likelihood(_bilby.Likelihood):
             # We remove the original prior here.
             log_jac_prior = _np.log(
                 _np.abs(
-                    _detector_to_source_jacobian(
-                        z_samples, cosmo, dl=self.dl_parallel)
+                    _detector_to_source_jacobian(z_samples, cosmo, dl=self.dl_parallel)
                 )
             ) + 2 * _np.log(self.dl_parallel)
 
@@ -279,8 +278,7 @@ class BBH_likelihood(_bilby.Likelihood):
             ) - _np.log(log_new_prior_term.shape[1])
 
             # Check for the number of effective sample
-            log_sum_weights = log_single_ev_array + \
-                _np.log(log_new_prior_term.shape[1])
+            log_sum_weights = log_single_ev_array + _np.log(log_new_prior_term.shape[1])
             log_sum_weights_squared = _logsumexp(
                 2 * (log_new_prior_term - log_jac_prior), axis=1
             )
@@ -309,8 +307,7 @@ class BBH_likelihood(_bilby.Likelihood):
             # Controls on the value of the log-likelihood. If the log-likelihood is -inf, then set it to the smallest
             # python valye 1e-309
             if log_likeli == _np.inf:
-                raise ValueError(
-                    "LOG-likelihood must be smaller than infinite")
+                raise ValueError("LOG-likelihood must be smaller than infinite")
 
             if _np.isnan(log_likeli):
                 log_likeli = float(_np.nan_to_num(-_np.inf))
@@ -356,10 +353,8 @@ class BBH_likelihood(_bilby.Likelihood):
                     - self.ln_evidences[i]
                     + _np.log(len(posterior_samples.mass_1_det))
                 )
-                log_sum_weights_squared = _logsumexp(
-                    log_new_prior_term - log_jac_prior)
-                Neff_vect = _np.exp(2 * log_sum_weights -
-                                    log_sum_weights_squared)
+                log_sum_weights_squared = _logsumexp(log_new_prior_term - log_jac_prior)
+                Neff_vect = _np.exp(2 * log_sum_weights - log_sum_weights_squared)
                 Neff_vect[_np.isnan(Neff_vect)] = 0.0
                 if _np.any(Neff_vect < 20):
                     return float(_np.nan_to_num(-_np.inf))
@@ -379,8 +374,7 @@ class BBH_likelihood(_bilby.Likelihood):
             log_likeli = _np.sum(log_likeli) + log_poissonian_term
 
             if log_likeli == _np.inf:
-                raise ValueError(
-                    "LOG-likelihood must be smaller than infinite")
+                raise ValueError("LOG-likelihood must be smaller than infinite")
 
             if _np.isnan(log_likeli):
                 log_likeli = float(_np.nan_to_num(-_np.inf))
@@ -400,7 +394,6 @@ class BBH_likelihood2(_bilby.Likelihood):
         parallel=2000,
         fixed_cosmo=False,
     ):
-
         # Some initialization below
         self.population_model = population_model
         self.posterior_samples_dict = _copy.deepcopy(posterior_samples_dict)
@@ -534,7 +527,7 @@ class BBH_likelihood2(_bilby.Likelihood):
                 "zp",
                 "kappa",
                 "R0_abh",
-                "log_v0"
+                "log_v0",
             ]
 
         elif population_model in [
@@ -551,6 +544,8 @@ class BBH_likelihood2(_bilby.Likelihood):
             self.list_population_param = ["ms", "α1", "α2", "log_fpbh"]
         elif population_model in ["DW"]:
             self.list_population_param = ["α0", "m0", "λχ0", "Φ0", "log_fpbh"]
+        elif population_model in ["PT"]:
+            self.list_population_param = ["beta", "logTreh"]
 
         if cosmo_model in ["flatLCDM", "fixed-flatLCDM", "restricted-flatLCDM"]:
             self.cosmo_model = "flatLCDM"
@@ -606,8 +601,7 @@ class BBH_likelihood2(_bilby.Likelihood):
             self.update_cosmo = True
 
         # initialization of the mass prior for a given set of parameters
-        self.dic = {ll: self.parameters[ll]
-                    for ll in self.list_population_param}
+        self.dic = {ll: self.parameters[ll] for ll in self.list_population_param}
         self.population = _population_prior(
             name=self.population_model, cosmo=self.cosmo, hyper_params_dict=self.dic
         )
@@ -623,7 +617,6 @@ class BBH_likelihood2(_bilby.Likelihood):
 
         # Below we calculate the likelihood as indicated in Eq. 7 on the tex document, see below for the terms
         if self.parallel:
-
             if self.population_model == "v_BBH-mass_powerlaw_gaussian-z_madau":
                 v0 = 10 ** self.parameters["log_v0"]
                 vs = 1 + get_z_doppler(v0, self.n_ev, self.n_min)
@@ -633,8 +626,7 @@ class BBH_likelihood2(_bilby.Likelihood):
                 ms1 = self.ms1
                 ms2 = self.ms2
 
-            log_new_prior_term = self.population.log_prob(
-                ms1, ms2, self.z_samples)
+            log_new_prior_term = self.population.log_prob(ms1, ms2, self.z_samples)
 
             # We remove the original prior here.
             log_jac_prior = _np.log(
@@ -666,8 +658,7 @@ class BBH_likelihood2(_bilby.Likelihood):
             # Controls on the value of the log-likelihood. If the log-likelihood is -inf, then set it to the smallest
             # python valye 1e-309
             if log_likeli == _np.inf:
-                raise ValueError(
-                    "LOG-likelihood must be smaller than infinite")
+                raise ValueError("LOG-likelihood must be smaller than infinite")
 
             if _np.isnan(log_likeli):
                 log_likeli = float(_np.nan_to_num(-_np.inf))
@@ -777,8 +768,7 @@ class hierarchical_analysis:
                         log_new_prior_term - log_jac_prior
                     ) - _np.log(len(posterior_samples.mass_1_det))
                     log_denominator = _np.log(beta)
-                    log_single_posterior[event][i] = log_numerator - \
-                        log_denominator
+                    log_single_posterior[event][i] = log_numerator - log_denominator
                 else:
                     if z_em[event] is None:
                         log_new_prior_term = mp_model.log_joint_prob(
@@ -795,11 +785,9 @@ class hierarchical_analysis:
                             log_new_prior_term - log_jac_prior
                         ) - _np.log(len(posterior_samples.mass_1_det))
                         log_denominator = _np.log(beta)
-                        log_single_posterior[event][i] = log_numerator - \
-                            log_denominator
+                        log_single_posterior[event][i] = log_numerator - log_denominator
                     else:
-                        mass_weight = _np.sum(
-                            mp_model.joint_prob(ms1, ms2)) / len(ms1)
+                        mass_weight = _np.sum(mp_model.joint_prob(ms1, ms2)) / len(ms1)
                         distance_weight = _np.sum(
                             kde_distance[event](cosmology.dl_at_z(z_em[event]))
                             * _np.power(cosmology.dl_at_z(z_em[event]), -2.0)
@@ -813,8 +801,7 @@ class hierarchical_analysis:
                         )
 
                 if _np.isnan(log_single_posterior[event][i]):
-                    log_single_posterior[event][i] = float(
-                        _np.nan_to_num(-np.inf))
+                    log_single_posterior[event][i] = float(_np.nan_to_num(-np.inf))
                 else:
                     log_single_posterior[event][i] = float(
                         _np.nan_to_num(log_single_posterior[event][i])
@@ -856,8 +843,7 @@ class hierarchical_analysis:
             parallel=parallel,
             scale_free=self.scale_free,
         )
-        result = _bilby.run_sampler(
-            likelihood=likeli, priors=prior_dict, **kwargs)
+        result = _bilby.run_sampler(likelihood=likeli, priors=prior_dict, **kwargs)
         return result
 
 
@@ -914,6 +900,5 @@ class hierarchical_analysis2:
             parallel=parallel,
             fixed_cosmo=self.fixed_cosmo,
         )
-        result = _bilby.run_sampler(
-            likelihood=self.likeli, priors=prior_dict, **kwargs)
+        result = _bilby.run_sampler(likelihood=self.likeli, priors=prior_dict, **kwargs)
         return result

@@ -9,22 +9,26 @@ from . import redshift as rs
 from julia.api import Julia
 
 jl = Julia(compiled_modules=False)
-jl.eval(
-    'include("/home/czc/projects/working/pbh/merger_history_GWTC3/code/merger_rate.jl")'
-)
+# jl.eval(
+#     'include("/home/czc/projects/working/pbh/merger_history_GWTC3/code/merger_rate.jl")'
+# )
 
-mergerRateDensity1st_log = jl.eval("mergerRateDensity1st_log")
-mergerRateDensity2nd_log = jl.eval("mergerRateDensity2nd_log")
-mergerRateDensity1st_power = jl.eval("mergerRateDensity1st_power")
-mergerRateDensity2nd_power = jl.eval("mergerRateDensity2nd_power")
-mergerRateDensity1st_CC = jl.eval("mergerRateDensity1st_CC")
-mergerRateDensity2nd_CC = jl.eval("mergerRateDensity2nd_CC")
-mergerRateDensity1st_bpower = jl.eval("mergerRateDensity1st_bpower")
-mergerRateDensity2nd_bpower = jl.eval("mergerRateDensity2nd_bpower")
+# mergerRateDensity1st_log = jl.eval("mergerRateDensity1st_log")
+# mergerRateDensity2nd_log = jl.eval("mergerRateDensity2nd_log")
+# mergerRateDensity1st_power = jl.eval("mergerRateDensity1st_power")
+# mergerRateDensity2nd_power = jl.eval("mergerRateDensity2nd_power")
+# mergerRateDensity1st_CC = jl.eval("mergerRateDensity1st_CC")
+# mergerRateDensity2nd_CC = jl.eval("mergerRateDensity2nd_CC")
+# mergerRateDensity1st_bpower = jl.eval("mergerRateDensity1st_bpower")
+# mergerRateDensity2nd_bpower = jl.eval("mergerRateDensity2nd_bpower")
 
 # Domain wall merger rate densigy ==========================================
-jl.eval('include("/home/czc/projects/working/pbh/domain_wall/code/DM_merger_rate.jl")')
-mergerRateDensity_DW = jl.eval("mergerRateDensity_DW")
+# jl.eval('include("/home/czc/projects/working/pbh/domain_wall/code/DM_merger_rate.jl")')
+# mergerRateDensity_DW = jl.eval("mergerRateDensity_DW")
+
+# PT merger rate densigy ==========================================
+# jl.eval('include("/home/czc/projects/working/pbh/PT_GWTC3/code/merger_rate.jl")')
+# mergerRateDensity_PT = jl.eval("mergerRateDensity_PT")
 
 
 def Pm_log(m, mc, σc):
@@ -114,9 +118,9 @@ class population_prior(object):
             to_ret = _np.log(self.cosmo.dVc_by_dz(zs)) - _np.log1p(zs)
 
             # pbh
-            logRpbh = (-34.0 / 37.0) * _np.log(_zs) + _np.log(mergerRateDensity_log(
-                mc, σc, log_fpbh, ms1, ms2
-            ))
+            logRpbh = (-34.0 / 37.0) * _np.log(_zs) + _np.log(
+                mergerRateDensity_log(mc, σc, log_fpbh, ms1, ms2)
+            )
 
             # abh
             m1pr = _cmp.PowerLawGaussian_math(
@@ -129,8 +133,7 @@ class population_prior(object):
                 min_g=mmin,
                 max_g=mu_g + 5 * sigma_g,
             )
-            m2pr = _cmp.PowerLaw_math(
-                alpha=beta, min_pl=mmin, max_pl=m1pr.maximum)
+            m2pr = _cmp.PowerLaw_math(alpha=beta, min_pl=mmin, max_pl=m1pr.maximum)
 
             log_rate_eval = rs.log_madau_rate(gamma, kappa, zp)
 
@@ -154,7 +157,10 @@ class population_prior(object):
 
             to_ret += _np.logaddexp(logRpbh, logRabh)
 
-        elif self.name in ["BBH-mass_powerlaw_gaussian-z_madau", "v_BBH-mass_powerlaw_gaussian-z_madau"]:
+        elif self.name in [
+            "BBH-mass_powerlaw_gaussian-z_madau",
+            "v_BBH-mass_powerlaw_gaussian-z_madau",
+        ]:
 
             alpha = hyper_params_dict["alpha"]
             beta = hyper_params_dict["beta"]
@@ -182,8 +188,7 @@ class population_prior(object):
                 min_g=mmin,
                 max_g=mu_g + 5 * sigma_g,
             )
-            m2pr = _cmp.PowerLaw_math(
-                alpha=beta, min_pl=mmin, max_pl=m1pr.maximum)
+            m2pr = _cmp.PowerLaw_math(alpha=beta, min_pl=mmin, max_pl=m1pr.maximum)
 
             log_rate_eval = rs.log_madau_rate(gamma, kappa, zp)
 
@@ -364,12 +369,26 @@ class population_prior(object):
             # )
             # to_ret += _np.log(R)
 
-            logR = (-34.0 / 37.0) * _np.log(_zs) + _np.log(mergerRateDensity_DW(
-                α0, m0, λχ0, Φ0, log_fpbh, ms1, ms2
-            ))
+            logR = (-34.0 / 37.0) * _np.log(_zs) + _np.log(
+                mergerRateDensity_DW(α0, m0, λχ0, Φ0, log_fpbh, ms1, ms2)
+            )
 
             to_ret += logR
             # pbh
+
+        elif self.name == "PT":
+            beta = hyper_params_dict["beta"]
+            logTreh = hyper_params_dict["logTreh"]
+
+            to_ret = _np.log(self.cosmo.dVc_by_dz(zs)) - _np.log1p(zs)
+
+            _zs = self.cosmo.t_at_z(zs) / self.cosmo.t_at_z(1e-4)
+
+            logR = (-34.0 / 37.0) * _np.log(_zs) + _np.log(
+                mergerRateDensity_PT(beta, logTreh, ms1, ms2)
+            )
+
+            to_ret += logR
 
         to_ret[_np.isnan(to_ret)] = -_np.inf
 
@@ -391,36 +410,40 @@ class population_prior(object):
 """
 
 
-def draw_random_number_from_pdf(pdf, interval, pdfmax=1, integers=False, max_iterations=1000000):
+def draw_random_number_from_pdf(
+    pdf, interval, pdfmax=1, integers=False, max_iterations=1000000
+):
     for i in range(max_iterations):
         if integers == True:
             rand_x = np.random.randint(interval[0], interval[1])
         else:
             # (b - a) * random_sample() + a
-            rand_x = (interval[1] - interval[0]) * \
-                np.random.random(1) + interval[0]
+            rand_x = (interval[1] - interval[0]) * np.random.random(1) + interval[0]
 
         rand_y = pdfmax * np.random.random(1)
         calc_y = pdf(rand_x)
 
-        if(rand_y <= calc_y):
+        if rand_y <= calc_y:
             return rand_x
 
-    raise Exception("Could not find a matching random number within pdf in " +
-                    max_iterations + " iterations.")
+    raise Exception(
+        "Could not find a matching random number within pdf in "
+        + max_iterations
+        + " iterations."
+    )
 
 
 def pdf_v0(v0, v):
-    return v**2 * np.exp(-v ** 2/v0 ** 2) / (0.885837118847261 * v0 ** 3)
+    return v**2 * np.exp(-(v**2) / v0**2) / (0.885837118847261 * v0**3)
 
 
 def get_rand_v(v0):
-    interval = [-3*v0, 3*v0]
+    interval = [-3 * v0, 3 * v0]
 
     def pdf_v(v):
         return pdf_v0(v0, v)
 
-    return draw_random_number_from_pdf(pdf_v, interval, 0.84/v0)
+    return draw_random_number_from_pdf(pdf_v, interval, 0.84 / v0)
 
 
 def get_z_doppler(v0, n_ev, n_min):
@@ -433,7 +456,7 @@ def get_z_doppler(v0, n_ev, n_min):
     vs = np.zeros([n_ev, n_min])
     for i in range(n_ev):
         v1 = get_rand_v(v0)[0]
-        v1s = np.random.normal(v1, 0.05*np.abs(v1), n_min)
+        v1s = np.random.normal(v1, 0.05 * np.abs(v1), n_min)
         vs[i, :] = v1s
 
-    return (1 - vs**2)**(-1/2) * (1 + vs)
+    return (1 - vs**2) ** (-1 / 2) * (1 + vs)
