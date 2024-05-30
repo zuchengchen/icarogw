@@ -10,28 +10,31 @@ import os
 from scipy.interpolate import interp2d
 
 # # start of PBH mass function for pbh==========================================
-# from julia.api import Julia
-# jl = Julia(compiled_modules=False)
-# jl.eval('include("/home/czc/projects/working/icarogw/examples/pbh_merger_rate.jl")')
+from julia.api import Julia
+jl = Julia(compiled_modules=False)
+jl.eval('include("/home/czc/projects/working/code_source/icarogw/examples/pbh_merger_rate.jl")')
 
-# log_R_pbh_log = jl.eval('log_R_pbh_log')
-# log_R_pbh_log_norm = jl.eval('log_R_pbh_log_norm')
+log_R_pbh_log = jl.eval('log_R_pbh_log')
+log_R_pbh_log_norm = jl.eval('log_R_pbh_log_norm')
 
-# log_R_pbh_log_nocut = jl.eval('log_R_pbh_log_nocut')
-# log_R_pbh_log_nocut_norm = jl.eval('log_R_pbh_log_nocut_norm')
+log_R_pbh_log_nocut = jl.eval('log_R_pbh_log_nocut')
+log_R_pbh_log_nocut_norm = jl.eval('log_R_pbh_log_nocut_norm')
 
-# log_R_pbh_power = jl.eval('log_R_pbh_power')
-# log_R_pbh_power_norm = jl.eval('log_R_pbh_power_norm')
+log_R_pbh_power = jl.eval('log_R_pbh_power')
+log_R_pbh_power_norm = jl.eval('log_R_pbh_power_norm')
 
-# log_R_pbh_power_nocut = jl.eval('log_R_pbh_power_nocut')
-# log_R_pbh_power_nocut_norm = jl.eval('log_R_pbh_power_nocut_norm')
+log_R_pbh_power_nocut = jl.eval('log_R_pbh_power_nocut')
+log_R_pbh_power_nocut_norm = jl.eval('log_R_pbh_power_nocut_norm')
 
-# log_R_pbh_cc = jl.eval('log_R_pbh_cc')
-# log_R_pbh_cc_norm = jl.eval('log_R_pbh_cc_norm')
+log_R_pbh_bpower_nocut = jl.eval('log_R_pbh_bpower_nocut')
+log_R_pbh_bpower_nocut_norm = jl.eval('log_R_pbh_bpower_nocut_norm')
 
-# log_R_pbh_cc_nocut = jl.eval('log_R_pbh_cc_nocut')
-# log_R_pbh_cc_nocut_norm = jl.eval('log_R_pbh_cc_nocut_norm')
-# # end of PBH mass function for pbh==========================================
+log_R_pbh_cc = jl.eval('log_R_pbh_cc')
+log_R_pbh_cc_norm = jl.eval('log_R_pbh_cc_norm')
+
+log_R_pbh_cc_nocut = jl.eval('log_R_pbh_cc_nocut')
+log_R_pbh_cc_nocut_norm = jl.eval('log_R_pbh_cc_nocut_norm')
+# end of PBH mass function for pbh==========================================
 
 
 class mass_prior(object):
@@ -170,6 +173,11 @@ class mass_prior(object):
             self.α = hyper_params_dict['α']
             self.m_min = hyper_params_dict['m_min']
 
+        elif self.name == 'PBH-bpowerlaw-nocut':
+            self.ms = hyper_params_dict['ms']
+            self.α1 = hyper_params_dict['α1']
+            self.α2 = hyper_params_dict['α2']
+
         elif self.name == 'PBH-cc':
             self.α = hyper_params_dict['α']
             self.Mf = hyper_params_dict['Mf']
@@ -217,6 +225,7 @@ class mass_prior(object):
         if self.name == 'PBH-lognormal':
             to_ret = log_R_pbh_log(ms1, ms2, self.mc, self.σc, self.m_min, self.m_max) - \
                 log_R_pbh_log_norm(self.mc, self.σc, self.m_min, self.m_max)
+
         elif self.name == 'PBH-lognormal-nocut':
             to_ret = log_R_pbh_log_nocut(
                 ms1, ms2, self.mc, self.σc) - log_R_pbh_log_nocut_norm(self.mc, self.σc)
@@ -224,13 +233,19 @@ class mass_prior(object):
         elif self.name == 'PBH-powerlaw':
             to_ret = log_R_pbh_power(ms1, ms2, self.α, self.m_min, self.m_max) - \
                 log_R_pbh_power_norm(self.α, self.m_min, self.m_max)
+
         elif self.name == 'PBH-powerlaw-nocut':
             to_ret = log_R_pbh_power_nocut(
                 ms1, ms2, self.α, self.m_min) - log_R_pbh_power_nocut_norm(self.α, self.m_min)
+        
+        elif self.name == 'PBH-bpowerlaw-nocut':
+            to_ret = log_R_pbh_bpower_nocut(
+                ms1, ms2, self.ms, self.α1, self.α2) - log_R_pbh_bpower_nocut_norm(self.ms, self.α1, self.α2)
 
         elif self.name == 'PBH-cc':
             to_ret = log_R_pbh_cc(ms1, ms2, self.α, self.Mf, self.m_min, self.m_max) - \
                 log_R_pbh_cc_norm(self.α, self.Mf, self.m_min, self.m_max)
+
         elif self.name == 'PBH-cc-nocut':
             to_ret = log_R_pbh_cc_nocut(
                 ms1, ms2, self.α, self.Mf) - log_R_pbh_cc_nocut_norm(self.α, self.Mf)

@@ -312,6 +312,11 @@ def initialize_prior_dict(population, cosmology, rates, scale_free):
         prior_dict["α"] = _bilby.core.prior.Uniform(1.001, 2.0, name="$\\alpha$")
         prior_dict["m_min"] = _bilby.core.prior.Uniform(3.0, 10.0, name="$m_{min}$")
 
+    elif population == "PBH-bpowerlaw-nocut":
+        prior_dict["ms"] = _bilby.core.prior.Uniform(5.0, 50.0, name="$m_*$")
+        prior_dict["α1"] = _bilby.core.prior.Uniform(0.001, 3.0, name="$\\alpha_1$")
+        prior_dict["α2"] = _bilby.core.prior.Uniform(1.001, 10.0, name="$\\alpha_2$")
+
     elif population == "PBH-cc":
         prior_dict["α"] = _bilby.core.prior.Uniform(0.5, 5.0, name="$\\alpha$")
         prior_dict["Mf"] = _bilby.core.prior.Uniform(5.0, 50.0, name="$M_f$")

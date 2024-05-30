@@ -66,7 +66,6 @@ class BBH_likelihood(_bilby.Likelihood):
         ln_evidences=None,
         scale_free=True,
     ):
-
         if mass_model not in [
             "BBH-powerlaw",
             "BBH-powerlaw-gaussian",
@@ -76,6 +75,7 @@ class BBH_likelihood(_bilby.Likelihood):
             "PBH-lognormal-nocut",
             "PBH-powerlaw",
             "PBH-powerlaw-nocut",
+            "PBH-bpowerlaw-nocut",
             "PBH-cc",
             "PBH-cc-nocut",
         ]:
@@ -171,6 +171,8 @@ class BBH_likelihood(_bilby.Likelihood):
             self.list_pop_param = ["α", "m_min", "m_max"]
         elif mass_model == "PBH-powerlaw-nocut":
             self.list_pop_param = ["α", "m_min"]
+        elif mass_model == "PBH-bpowerlaw-nocut":
+            self.list_pop_param = ["ms", "α1", "α2"]
         elif mass_model == "PBH-cc":
             self.list_pop_param = ["α", "Mf", "m_min", "m_max"]
         elif mass_model == "PBH-cc-nocut":
@@ -251,7 +253,6 @@ class BBH_likelihood(_bilby.Likelihood):
 
         # Below we calculate the likelihood as indicated in Eq. 7 on the tex document, see below for the terms
         if self.parallel:
-
             ms1, ms2, z_samples = _detector_frame_to_source_frame(
                 cosmo, self.m1det_parallel, self.m2det_parallel, self.dl_parallel
             )
@@ -393,7 +394,6 @@ class BBH_likelihood2(_bilby.Likelihood):
         parallel=2000,
         fixed_cosmo=False,
     ):
-
         # Some initialization below
         self.population_model = population_model
         self.posterior_samples_dict = _copy.deepcopy(posterior_samples_dict)
@@ -545,6 +545,8 @@ class BBH_likelihood2(_bilby.Likelihood):
             self.list_population_param = ["ms", "α1", "α2", "log_fpbh"]
         elif population_model in ["DW"]:
             self.list_population_param = ["α0", "m0", "λχ0", "Φ0", "log_fpbh"]
+        elif population_model in ["PT"]:
+            self.list_population_param = ["beta", "logTreh"]
 
         if cosmo_model in ["flatLCDM", "fixed-flatLCDM", "restricted-flatLCDM"]:
             self.cosmo_model = "flatLCDM"
@@ -616,7 +618,6 @@ class BBH_likelihood2(_bilby.Likelihood):
 
         # Below we calculate the likelihood as indicated in Eq. 7 on the tex document, see below for the terms
         if self.parallel:
-
             if self.population_model == "v_BBH-mass_powerlaw_gaussian-z_madau":
                 v0 = 10 ** self.parameters["log_v0"]
                 vs = 1 + get_z_doppler(v0, self.n_ev, self.n_min)
