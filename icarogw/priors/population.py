@@ -9,23 +9,23 @@ from . import redshift as rs
 from julia.api import Julia
 
 jl = Julia(compiled_modules=False)
-# jl.eval(
-#     'include("/home/czc/projects/working/pbh/merger_history_GWTC3/code/merger_rate.jl")'
-# )
 
-# mergerRateDensity1st_log = jl.eval("mergerRateDensity1st_log")
 jl.eval(
     'include("/home/czc/projects/working/pbh/GW230529/code/merger_rate.jl")'
 )
-
 mergerRateDensity_log = jl.eval("mergerRateDensity_log")
 mergerRateDensity_norm = jl.eval("mergerRateDensity_norm")
+
+jl.eval(
+    'include("/home/czc/projects/working/pbh/merger_history_GWTC3/code/merger_rate.jl")'
+)
+mergerRateDensity1st_log = jl.eval("mergerRateDensity1st_log")
 # mergerRateDensity2nd_log = jl.eval("mergerRateDensity2nd_log")
-# mergerRateDensity1st_power = jl.eval("mergerRateDensity1st_power")
+mergerRateDensity1st_power = jl.eval("mergerRateDensity1st_power")
 # mergerRateDensity2nd_power = jl.eval("mergerRateDensity2nd_power")
-# mergerRateDensity1st_CC = jl.eval("mergerRateDensity1st_CC")
+mergerRateDensity1st_CC = jl.eval("mergerRateDensity1st_CC")
 # mergerRateDensity2nd_CC = jl.eval("mergerRateDensity2nd_CC")
-# mergerRateDensity1st_bpower = jl.eval("mergerRateDensity1st_bpower")
+mergerRateDensity1st_bpower = jl.eval("mergerRateDensity1st_bpower")
 # mergerRateDensity2nd_bpower = jl.eval("mergerRateDensity2nd_bpower")
 
 # Domain wall merger rate densigy ==========================================
@@ -33,8 +33,8 @@ mergerRateDensity_norm = jl.eval("mergerRateDensity_norm")
 # mergerRateDensity_DW = jl.eval("mergerRateDensity_DW")
 
 # PT merger rate densigy ==========================================
-# jl.eval('include("/home/czc/projects/working/pbh/PT_GWTC3/code/merger_rate.jl")')
-# mergerRateDensity_PT = jl.eval("mergerRateDensity_PT")
+jl.eval('include("/home/czc/projects/working/gwtc3/PT_GWTC3/code/merger_rate.jl")')
+mergerRateDensity_PT = jl.eval("mergerRateDensity_PT")
 
 
 def Pm_log(m, mc, σc):
